@@ -108,7 +108,8 @@ class MoP:
                     standard_train(self.configs, cepoch, self.model, self.train_loader, 
                                 criterion, optimizer, scheduler, ADMM=admm, comm=True)
                 acc = self.test_model(self.model, criterion, cepoch)
-                
+                if self.configs['reassign']:
+                    save_partition(self.configs, cepoch)
             # hard prune
             hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
             

@@ -21,6 +21,8 @@ retrain_bs: 128
 retrain_lr: 0.001
 retrain_ep: 100
 retrain_opt: default
+reassign: True
+reassign_freq: 1
 
 xentropy_weight: 1.
 

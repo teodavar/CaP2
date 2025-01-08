@@ -151,35 +151,30 @@ def update_assignments(model, configs):
                         and other training-related configs.
     """
 
-    # Ensure 'input' partition exists
-    if 'input' not in configs['partition']:
-        raise KeyError("The 'input' partition is missing in configs['partition']. "
-                       "Please define configs['partition']['input'] before calling update_assignments.")
 
     # Extract all layer names with weights from the model's state_dict
     # A layer_name is derived from state_dict keys ending with '.weight', for example 'conv1.weight' -> 'conv1'
     state_dict_keys = model.state_dict().keys()
-    weight_layers = [key[:-7] for key in state_dict_keys if key.endswith('.weight')]
 
     # Intersect with partitions keys to ensure we only handle layers present in both the model and the partition config
     partition_layer_names = set(configs['partition'].keys())
-    # Filter weight_layers to keep only those in partition and also skip 'input' since it's not a real layer
-    layer_names = [lname for lname in weight_layers if lname in partition_layer_names and lname != 'input']
+    # Filter weight_layers to keep only those in partition and also skip 'inputs' since it's not a real layer
+    layer_names = [lname for lname in state_dict_keys if lname in partition_layer_names and lname != 'inputs']
 
     # If no layers found, nothing to update
     if not layer_names:
         print("No layers with weights found in both model and partition. Nothing to update.")
         return
 
-    # Iterate over layers in order. We rely on the order from weight_layers which usually matches model definition order.
+    # Iterate over layers in order. We rely on the order from state_dict_keys which usually matches model definition order.
     for idx, layer_name in enumerate(layer_names):
         # The original partition for this layer is the current partition state before reassigning
         original_partition = configs['partition'][layer_name].copy()
 
         # Determine the previous partition
         if idx == 0:
-            # For the first layer, use 'input' partition as previous_partition
-            previous_partition = configs['partition']['input']
+            # For the first layer, use 'inputs' partition as previous_partition
+            previous_partition = {'filter_id': configs['partition'][layer_name]['channel_id']}
         else:
             # Otherwise, use the partition from the previous layer
             prev_layer_name = layer_names[idx - 1]

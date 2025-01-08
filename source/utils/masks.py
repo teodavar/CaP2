@@ -37,6 +37,68 @@ def create_partition(configs, model):
     else:
         raise Exception("num_partition must be an integer to initialize partition")
 
+def save_partition(configs, epoch):
+    """
+    Reconstructs the old-style `full_dict` containing:
+        - bn_partitions
+        - partitions (the ratio_partition)
+        - maps (the map_partition)
+    and saves it in configs['partition_path'] + f'_{epoch}'.
+    
+    Args:
+        configs (dict): Your main configuration dictionary, which includes `configs['partition']`.
+        epoch (int): ADMM epoch.
+    
+    Returns:
+        dict: A dictionary with keys `bn_partitions`, `partitions`, and `maps`.
+              This mirrors the original format of `full_dict`.
+    """
+
+    class MyDumper(yaml.SafeDumper):
+        def increase_indent(self, flow=False, indentless=False):
+            return super(MyDumper, self).increase_indent(flow=flow, indentless=indentless)
+        
+    with open(configs['partition_path'], "r") as stream:
+        raw_dict = yaml.safe_load(stream)
+        maps = raw_dict['maps']
+    
+    partition_dict = configs.get('partition', {})
+    if not partition_dict:
+        raise ValueError("configs['partition'] is empty or not defined.")
+    
+    # Recover bn_partitions
+    bn_partition = partition_dict.get('bn_partition', {})
+    
+    # Rebuild partition by looking at `filter_id` in each layer
+    filter_partition = {}
+    
+    # We skip keys that are not real layers, e.g. 'bn_partition', 'input', etc.
+    skip_keys = {'bn_partition', 'input'}  # Adjust as needed for your code
+    for layer_name, layer_info in partition_dict.items():
+        # Skip non-layer keys
+        if layer_name in skip_keys:
+            continue
+        
+        # Each layer_info looks like:
+        # {
+        #   'num': num_partitions,
+        #   'filter_id': [array_of_indices_partition0, array_of_indices_partition1, ...],
+        #   'channel_id': [...],
+        #   'maps': ...
+        # }
+        filter_id_list = layer_info.get('filter_id', [])
+        filter_partition[layer_name] = filter_id_list
+    # Add input partition
+    filter_partition['inputs'] = raw_dict['partitions']['inputs']
+    # Finally, build the old-style dict
+    full_dict = {
+        'bn_partitions': bn_partition,
+        'partitions': filter_partition,  
+        'maps': maps
+    }
+    with open(configs['partition_path'] + f'_{epoch}', "w") as stream:
+        yaml.dump(full_dict, stream, Dumper=MyDumper, default_flow_style=False)
+    
 
 def partition_generator(configs, model):
     partition = {}

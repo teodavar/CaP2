@@ -61,16 +61,16 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         if comm:
             for (name, W) in model.named_parameters():
                 if name in ADMM.prune_ratios:
-                    comm_cost = torch.abs(W) * configs['comm_costs'][name]
+                    #comm_cost = torch.abs(W) * configs['comm_costs'][name]
                     '''
                     v1: abs(W)*comm_cost
-                    '''
+                    
                     comm_cost = comm_cost.view(comm_cost.size(0), -1).sum()
                     if configs['comm_outsize']:
                         comm_loss += comm_cost*partition[name]['outsize']
                     else:
                         comm_loss += comm_cost
-                    
+                    '''
                     '''
                     #v2: further constraint on max(abs(W)*comm_cost)
                     '''
@@ -91,6 +91,35 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
                     for i in range(partition[name]['num']):
                         comp_loss = max(comp_loss, torch.abs(W).view(W.size(0), -1)[partition[name]['filter_id'][i],:].sum())
                     '''
+                    '''
+                    v3: take into account inference split
+                    '''
+                    # Reshape weights and compute absolute sum across kernel dimensions
+                    weight_shape = W.shape
+                    W = W.cpu().detach()
+                    if len(weight_shape) == 4:  # Convolutional layer
+                        W_flat = torch.sum(torch.abs(W.view(weight_shape[0], weight_shape[1], -1)), dim=2)
+                    elif len(weight_shape) == 2:  # Fully connected layer
+                        W_flat = torch.abs(W)  # No need to reshape for FC layers
+                    else:
+                        raise ValueError(f"Unsupported weight shape: {weight_shape}")
+
+                    # Retrieve partition and cost information
+                    partition = configs['partition'][name]
+                    comm_cost_map = configs['comm_costs'][name]  # Communication cost map
+                    outsize = partition['outsize'] if configs['comm_outsize'] else 1
+
+                    # Compute communication costs for each node
+                    for n in range(partition['num']):  # Nodes for output channels
+                        for C_out in partition['filter_id'][n]:  # Output channels in node n
+                            for i in range(partition['num']):  # Nodes for input channels
+                                input_channels = partition['channel_id'][i]
+                                
+                                # Check if any weights are active
+                                if torch.any(W_flat[C_out, input_channels]):
+                                    # Add communication cost
+                                    total_cost += comm_cost_map[i][n] * outsize
+
             total_loss += configs['lambda_comm'] * comm_loss + configs['lambda_comp'] * comp_loss
             # print('total_loss:', total_loss)
         
