@@ -1,5 +1,8 @@
 import numpy as np
 from munkres import Munkres, print_matrix
+from scipy.optimize import linear_sum_assignment
+from numpy import genfromtxt
+from time import time
 import sys
 
 def compute_cost_matrix(layer_name, layer_weights, partition):
@@ -107,7 +110,7 @@ def add_virtualmachines(c,b=None):
     '''
     c is an array of shape (num of tasks, num of machines)
     b is the capacity of the machines
-    creates dulicates of each machine to exress capacity
+    creates dulicates of each machine to express capacity
     '''
     (n,m) = c.shape
     if n<=m:
@@ -120,7 +123,7 @@ def add_virtualmachines(c,b=None):
     c= np.repeat(c, b, axis=1)
     return c,b
         
-def computeassignment(c,b=None):
+def computeassignment_old(c,b=None):
     """
     computes the assignment problem 
     returns list of elements (task, machine, cost)
@@ -130,13 +133,39 @@ def computeassignment(c,b=None):
     indexes = m.compute(cv)
     output=[]
     rcs=[]
+    total_cost=0
     for row, column in indexes:
+        #print(b)
+        rc=column // b
+        
+        #print("vm= ", column, "m= ",rc)
+        value = c[row][rc]
+        #output.append((row,rc,value))
+        total_cost=total_cost+value
+        rcs.append(rc)
+    return rcs #, total_cost #output
+
+
+def computeassignment(c,b=None):
+    """
+    computes the assignment problem 
+    returns list of elements (task, machine, cost)
+    """
+    (cv,b)=add_virtualmachines(c,b)
+    rows,cols=linear_sum_assignment(cv)
+    output=[]
+    rcs=[]
+    row=0
+    total_cost=0
+    for column in cols:
         rc=column // b
         #print("vm= ", column, "m= ",rc)
         value = c[row][rc]
-        output.append((row,rc,value))
+        #output.append((row,rc,value))
         rcs.append(rc)
-    return rcs #output
+        total_cost=total_cost+value
+        row=row+1
+    return rcs #, total_cost #output
         
 def update_assignments(model, configs):
     """
@@ -209,31 +238,8 @@ def update_assignments(model, configs):
         # Update the current partition for this layer
         configs['partition'][layer_name] = new_partition
 
-
-if __name__ == "__main__":
-    """
-    testing assignment solutions
-    """
-    matrix = [[5, 9, 1,10,10,10,10],
-              [5, 9, 1,10,10,10,10],
-              [5, 9, 1,10,10,10,10],
-              [10, 3, 2,10,10,10,10],
-              [10, 3, 2,10,10,10,10],
-              [10, 3, 2,10,10,10,10],
-              [8, 7, 4,10,10,10,10]]
-    
-    matrix2= [[2,1,0],
-              [0,3,2],
-              [1,1,0],
-              [2,0,5],
-              [0,2,2],
-              [1,0,1],
-              [2,6,0],
-              [0,1,2],
-              [5,1,0],
-              [2,0,2]]
-    
-    c=np.array(matrix2)
+def example(matrix):    
+    c=np.array(matrix)
     print(np.repeat(c, 5, axis=1))
     (cv,b)=add_virtualmachines(c)
     print(c.shape,b)
@@ -251,7 +257,40 @@ if __name__ == "__main__":
         total += value
         print(f'({row}, {rc}) -> {value}')
     print(f'total cost: {total}')
+    return 0
+    
+if __name__ == "__main__":
+    """
+    testing assignment solutions
+    """
+    matrix = [[5, 9, 1,10,10,10,10],
+              [5, 9, 1,10,10,10,10],
+              [5, 9, 1,10,10,10,10],
+              [10, 3, 2,10,10,10,10],
+              [10, 3, 2,10,10,10,10],
+              [10, 3, 2,10,10,10,10],
+              [8, 7, 4,10,10,10,10]]
+    matrix2= [[2,1,0],
+              [0,3,2],
+              [1,1,0],
+              [2,0,5],
+              [0,2,2],
+              [1,0,1],
+              [2,6,0],
+              [0,1,2],
+              [5,1,0],
+              [2,0,2]]
+    c=np.array(matrix2)
+    #my_data = genfromtxt('C:\\Users\\costa\\Desktop\\project\\CaP2\\source\\utils\\cost_matrix_1738178956.csv', delimiter=',')
+    #print(my_data.shape)
+    t1=time()
     print("test")
+    print(computeassignment_old(c))
+    t2=time()
+    print("test new:")
     print(computeassignment(c))
+    t3=time()
+    print(t2-t1,t3-t2)
+    
     
         
