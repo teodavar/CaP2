@@ -157,6 +157,24 @@ def weight_pruning(weight, name, prune_ratio, sparsity_type, cross_x=4, cross_f=
         weight = weight.reshape(shape)
         return torch.from_numpy(
             expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
+    
+    elif (sparsity_type == "row"):
+        shape = weight.shape
+        weight2d = weight.reshape(shape[0], -1)
+        shape2d = weight2d.shape
+        row_l2_norm = LA.norm(weight2d, 2, axis=1)  # Compute L2 norms for rows
+        percentile = np.percentile(row_l2_norm, percent)
+        under_threshold = row_l2_norm < percentile
+        above_threshold = row_l2_norm > percentile
+        weight2d[under_threshold, :] = 0  # Set rows below the threshold to zero
+        above_threshold = above_threshold.astype(np.float32)
+        expand_above_threshold = np.zeros(shape2d, dtype=np.float32)
+        for i in range(shape2d[0]):
+            expand_above_threshold[i, :] = above_threshold[i]
+        expand_above_threshold = expand_above_threshold.reshape(shape)
+        weight = weight.reshape(shape)
+        return torch.from_numpy(
+            expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
 
     elif (sparsity_type == 'partition'):
         num_partition = partition[name]['num']

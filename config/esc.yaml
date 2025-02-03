@@ -20,6 +20,8 @@ retrain_bs: 128
 retrain_lr: 0.00001
 retrain_ep: 100
 retrain_opt: adam
+reassign: True
+reassign_freq: 15
 
 xentropy_weight: 1.
 
