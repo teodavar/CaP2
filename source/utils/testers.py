@@ -132,8 +132,7 @@ def test_channel_sparsity(model):
                 # print(np.sum(weight[:,i,:,:].cpu().detach().numpy()))
                 if np.sum(weight[:,i,:,:]) == 0:
                     empty_channel += 1
-            print("(total/empty) channel of {} is: ({}/{}). channel sparsity is: {:.4f}".format(
-                name, weight.shape[1], empty_channel, empty_channel / channel_num))
+            print("(total/empty) channel of {} is: ({}/{}). channel sparsity is: {:.4f}".format(name, weight.shape[1], empty_channel, empty_channel / channel_num))
             total_channel += channel_num
             total_empty_channel += empty_channel
 
@@ -261,6 +260,7 @@ def test_partition(model, partition):
     total_max_comm_interp = 0
     total_params = 0
     
+    num = partition['num']    
 
     for name, W in model.named_parameters():
         if name in partition: # only consider conv layers
@@ -268,13 +268,24 @@ def test_partition(model, partition):
             weight = W.cpu().detach().numpy()
             shape = weight.shape
             kernel_size = 1 if len(shape)==2 else shape[2]*shape[3]
-            outsize = partition[name]['outsize']
+            outsize = partition[name].get('outsize', 1)
+            parents = partition[name].get('parents', [])
             
             weight2d = weight.reshape(weight.shape[0], weight.shape[1], -1).sum(-1)
-            
             cost_mask = np.ones(weight2d.shape)
-            for i in range(partition[name]['num']):
-                cost_mask[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][i]] = 0
+            
+            for i in range(num):
+                for parent in parents:
+                    if parent not in partition:
+                        raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
+
+                    parent_filter_ids = partition[parent]['filter_id']
+                    for j in range(num):
+                        if i == j:
+                            continue
+                        cost_mask[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]] = 0
+            
+           
             cost_mask = cost_mask.astype("bool")
             weight_select = weight2d*cost_mask
             
@@ -288,19 +299,25 @@ def test_partition(model, partition):
             
             # check inter-p kernels per partition
             interps, comms_interp = [], []
-            for i in range(partition[name]['num']):
-                for j in range(partition[name]['num']):
+            for i in range(num):
+                for j in range(num):
                     if i==j: continue
-                    if len(shape) > 2:
-                        # None is necessary here to keep numpy array after sum 
-                        # TODO: double check we arent skipping any channels. There are 5 elements in partition[name]['channel_id'] for some reason but only iterate through 4
-                        # counts the number of feature maps communicated from 1 partition to another. TODO: double check this is correct. Shouldnt the sum across out channels be removed? # feature maps communicated should be = C_in*C_out not = C_in 
-                        each = np.sum(np.sum(weight_select[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]], axis=0) != 0)
-                    else:
-                        each = np.sum((weight_select[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]]) != 0)
-                    #each *= partition[name]['maps'][i][j]
+                    each = 0
+                    for parent in parents:
+                        if parent not in partition:
+                            raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
+
+                        parent_filter_ids = partition[parent]['filter_id']
+                        if len(shape) > 2:
+                            # Compute feature maps communicated between partitions
+                            each += np.sum(
+                                np.sum(weight_select[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]], axis=0) != 0
+                            )
+                        else:
+                            each += np.sum(weight_select[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]] != 0)
+                    
                     interps.append(each)
-                    comms_interp.append(each*outsize*partition[name]['maps'][i][j])
+                    comms_interp.append(each * outsize * partition['maps'][i][j])
             
             # update
             total_kernels += kernels
@@ -324,6 +341,120 @@ def test_partition(model, partition):
     print("total_comms:{}, max-interp-comm:{}".format(total_comm_interp, total_max_comm_interp))
     
     print("===========================================================================\n\n")
+    
+    
+import numpy as np
+
+def test_partition_with_free_channels(model, partition):
+    """
+    Tests partition sparsity while considering that if a machine is already computing a filter
+    for an output channel with one input channel, then any additional input channels in that 
+    machine for that output channel are considered free.
+    
+    Args:
+        model: PyTorch model with convolutional layers.
+        partition: Dictionary describing how the model is partitioned across machines.
+    
+    Returns:
+        None (prints statistics and visualizes communication savings).
+    """
+
+    total_kernels = 0
+    total_zeros = 0
+    total_interpk = 0
+    total_interpk_select = 0
+    total_interp = 0
+    total_interp_select = 0
+    total_comm_interp = 0
+    total_max_comm_interp = 0
+    total_params = 0
+
+    num = partition['num']
+
+    for name, W in model.named_parameters():
+        if name in partition:  # Only consider conv layers
+            weight = W.cpu().detach().numpy()
+            shape = weight.shape
+            kernel_size = 1 if len(shape) == 2 else shape[2] * shape[3]
+            outsize = partition[name].get('outsize', 1)
+            parents = partition[name].get('parents', [])
+
+            weight2d = weight.reshape(weight.shape[0], weight.shape[1], -1).sum(-1)
+            cost_mask = np.ones(weight2d.shape)
+
+            for i in range(num):
+                for parent in parents:
+                    if parent not in partition:
+                        raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
+
+                    parent_filter_ids = partition[parent]['filter_id']
+                    
+                    for j in range(num):
+                        if i == j:
+                            continue
+                        
+                        # If a machine computes a filter for one input channel, it gets all input channels "for free"
+                        filter_indices = partition[name]['filter_id'][i]
+                        cost_mask[filter_indices[:, None], parent_filter_ids[j]] = 0
+
+            cost_mask = cost_mask.astype(bool)
+            weight_select = weight2d * cost_mask
+
+            intra_weight = np.sum(~cost_mask * weight2d != 0)
+
+            kernels = shape[0] * shape[1]
+            kernels_zeros = np.sum(weight2d == 0)
+            interpk = np.sum(cost_mask != 0)
+            interpk_select = np.sum((weight_select) != 0)
+
+            # Check inter-partition kernels per partition
+            interps, comms_interp = [], []
+            for i in range(num):
+                for j in range(num):
+                    if i == j:
+                        continue
+                    each = 0
+                    for parent in parents:
+                        if parent not in partition:
+                            raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
+                            
+                        parent_filter_ids = partition[parent]['filter_id']
+                        if len(shape) > 2:
+                            # Compute feature maps communicated between partitions
+                            each += np.sum(
+                                np.sum(weight_select[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]], axis=0) != 0
+                            )
+                        else:
+                            each += np.sum(weight_select[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]] != 0)
+
+                    interps.append(each)
+                    comms_interp.append(each * outsize * partition['maps'][i][j])
+
+            # Update totals
+            total_kernels += kernels
+            total_zeros += kernels_zeros
+            total_interpk += interpk
+            total_interpk_select += interpk_select
+            total_interp += interpk * kernel_size
+            total_interp_select += interpk_select * kernel_size
+            total_comm_interp += sum(comms_interp)
+            total_max_comm_interp += max(comms_interp)
+            total_params += kernels * kernel_size
+
+            print("{}:   params:{},           params-intrap:{},         params-interp:{},           interp-k:{},    interp-k(select):{},   max-interp-k(select):{},     outsize:{}, total-interp-comm:{}, max-interp-comm:{}".format(
+                name, kernels * kernel_size, intra_weight * kernel_size, interpk_select * kernel_size, interpk, interpk_select, max(interps), outsize, sum(comms_interp), max(comms_interp)))
+            print(comms_interp)
+
+    print("---------------------------------------------------------------------------")
+    print("total number of kernels:{}, zero-kernels:{}, kernel sparsity is: {:.4f}".format(
+        total_kernels, total_zeros, total_zeros / total_kernels))
+    print("total number of params:{}, total_interp:{}, total_interp_select:{}, total_interpk:{}, total_interpk_select:{}".format(
+        total_params, total_interp, total_interp_select, total_interpk, total_interpk_select))
+    print("total_comms:{}, max-interp-comm:{}".format(total_comm_interp, total_max_comm_interp))
+    print("===========================================================================\n\n")
+
+    return total_comm_interp, total_max_comm_interp  # Can be used for further visualization or comparison
+
 
 def get_concat_v_blank(im1, im2, margins=0):
     dst = Image.new('RGB', (im1.width, im1.height + im2.height + margins), color=(255,255,255))
@@ -348,10 +479,19 @@ def plot_layer(model, partition, layer_id=(1,), savepath=''):
                 inter-weights(1) := 1 -> red
                 '''
                 weight2d[weight2d>0] = 2
-                for i in range(partition[name]['num']):
-                    for j in range(partition[name]['num']):
-                        if i==j: continue
-                        weight2d[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]] -= 1
+                for i in range(partition['num']):
+                    for parent in partition[name].get('parents', []):
+                        if parent == "inputs":
+                            continue  # Skip input dependencies
+
+                        if parent not in partition:
+                            raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
+
+                        parent_filter_ids = partition[parent]['filter_id']
+
+                        for j in range(partition['num']):
+                            if i==j: continue
+                            weight2d[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]] -= 1
                 weight2d[weight2d==-1] = 0
                 
                 #red, green = '#FF716E', '#B4C06E'

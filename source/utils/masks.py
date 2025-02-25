@@ -2,11 +2,16 @@ import os
 import yaml
 import torch
 import numpy as np
+import torch.fx as fx
+import torch.nn as nn
+import operator
+import random
 import time
 import itertools
 import re
+import copy
 
-def create_partition(configs, model):
+def create_partition_legacy(configs, model):
 
     class MyDumper(yaml.SafeDumper):
         def increase_indent(self, flow=False, indentless=False):
@@ -37,93 +42,185 @@ def create_partition(configs, model):
             yaml.dump(full_dict, stream, Dumper=MyDumper, default_flow_style=False)
     else:
         raise Exception("num_partition must be an integer to initialize partition")
+        
+def create_partition(configs, model):
 
-import yaml
-import numpy as np
-
-def save_partition(configs, epoch):
-    """
-    Reconstructs the old-style `full_dict` containing:
-        - bn_partitions
-        - partitions (the filter_partition)
-        - maps (the map_partition)
-    and saves it in configs['partition_path'] + f'_{epoch}'.
-
-    Args:
-        configs (dict): Your main configuration dictionary, which includes `configs['partition']`.
-        epoch (int): ADMM epoch.
-    """
     class MyDumper(yaml.SafeDumper):
-        # Keep your indentation override if needed
         def increase_indent(self, flow=False, indentless=False):
             return super(MyDumper, self).increase_indent(flow=flow, indentless=indentless)
 
-    def represent_list_flow(dumper, data):
-        return dumper.represent_sequence(u'tag:yaml.org,2002:seq', data, flow_style=True)
+    def represent_list(dumper, data):
+        return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
 
-    MyDumper.add_representer(list, represent_list_flow)
+    MyDumper.add_representer(list, represent_list)
 
+    num_partition = {}
+    if isinstance(configs['num_partition'], int):
+        bn_partition = [int(configs['num_partition'])] * 9
+        num = int(configs['num_partition'])
+        maps = np.ones((num, num))
+        np.fill_diagonal(maps, 0)
+        
+        budget = configs.get('budget', [1]*num)
+        input_part = configs.get('input_partition', [1]*num)
+        layers = ['inputs']
+        budgets = []
+        
+        for name, W in itertools.chain(model.named_parameters()):
+            if (len(W.size()) == 4 or len(W.size()) == 2) and 'out' not in name:
+                layers.append(name)
+                budgets.append(list(budget))
+        
+        full_dict = {
+            'bn_partitions': bn_partition,
+            'maps': maps.astype(int).tolist(),
+            'num': configs['num_partition'],
+            'initial_budget': budget,
+            'budgets': budgets,
+            'input_partition': input_part,
+            'layers': layers
+        }
+        
+        with open(configs['partition_path'], "w") as stream:
+            yaml.dump(full_dict, stream, Dumper=MyDumper, default_flow_style=False)
+    else:
+        raise Exception("num_partition must be an integer to initialize partition")
 
-    # Load the original YAML to preserve 'maps' and 'inputs'
+def save_partition(configs, epoch=0, save_path=None):
+    class MyDumper(yaml.SafeDumper):
+        def increase_indent(self, flow=False, indentless=False):
+            return super(MyDumper, self).increase_indent(flow=flow, indentless=indentless)
+
+    def represent_list(dumper, data):
+        return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
+    
+    MyDumper.add_representer(list, represent_list)
+    
+    partition_copy = copy.deepcopy({k: v for k, v in configs['partition'].items() if k != 'model_graph'})
+    
+    # Convert filter_id lists of lists into standard lists
+    for layer in partition_copy:
+        if isinstance(partition_copy[layer], dict) and 'filter_id' in partition_copy[layer]:
+            partition_copy[layer]['filter_id'] = [sublist.tolist() for sublist in partition_copy[layer]['filter_id'] if isinstance(sublist, np.ndarray)]
+        if isinstance(partition_copy[layer], dict) and 'budget' in partition_copy[layer]:
+            partition_copy[layer]['budget'] = [sublist.tolist() for sublist in partition_copy[layer]['budget'] if isinstance(sublist, np.ndarray)]
+        if isinstance(partition_copy[layer], np.ndarray):
+            partition_copy[layer] = partition_copy[layer].tolist()
+            
+    
+    if save_path is None:
+        save_path = re.sub(r'\.ya?ml$', '', configs['partition_path'])
+        save_path = save_path + f'_{epoch}.yaml'
+    
+    with open(save_path, "w") as stream:
+        yaml.dump(partition_copy, stream, Dumper=MyDumper, default_flow_style=False)
+    
+    print(f"Partition saved to {save_path}")
+    
+def load_partition(configs, model):
+    """
+    Loads the partition YAML file and reconstructs the partition dictionary.
+    Converts any list-based `filter_id` back into NumPy arrays.
+    """
+    with open(configs['partition_path'], "r") as stream:
+        partition_data = yaml.safe_load(stream)
+
+    # Convert lists back to NumPy arrays where applicable
+    for key, value in partition_data.items():
+        if isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if (sub_key == 'filter_id' or sub_key == 'budget') and isinstance(sub_value, list):  # Convert lists back to NumPy arrays
+                    partition_data[key][sub_key] = [np.array(li) for li in sub_value]
+    
+    configs['partition'] = partition_data
+    
+    model_graph = fx.symbolic_trace(model)
+    node_map = build_node_map(model_graph)
+    add_node_pairs_map = build_add_pairs(model_graph, partition_data, node_map)
+    
+    configs['partition']['model_graph'] = {
+        'graph': model_graph,
+        'node_map': node_map,
+        'addition_nodes': add_node_pairs_map,
+    }
+    
+    print("Partition loaded and model graph reconstructed.")
+    return configs
+
+def generate_partition(configs, model):
     with open(configs['partition_path'], "r") as stream:
         raw_dict = yaml.safe_load(stream)
-        maps = raw_dict['maps']  # Old map_partition
-        inputs = raw_dict['partitions']['inputs']  # The old 'inputs' partition ratio/IDs
-
-    partition_dict = configs.get('partition', {})
-    if not partition_dict:
-        raise ValueError("configs['partition'] is empty or not defined.")
     
-    # Recover bn_partitions
-    bn_partition = partition_dict.get('bn_partition', {})
-
-    # Rebuild filter_partition from 'filter_id' in each layer
-    filter_partition = {}
-
-    # We skip keys that are not real layers, e.g. 'bn_partition', 'input', etc.
-    skip_keys = {'bn_partition', 'inputs'}  # Adjust as needed
-    for layer_name, layer_info in partition_dict.items():
-        if layer_name in skip_keys:
-            continue
-
-        # layer_info is like:
-        # {
-        #   'num': num_partitions,
-        #   'filter_id': [array_of_indices_for_partition0, array_of_indices_for_partition1, ...],
-        #   'channel_id': [...],
-        #   'maps': ...
-        # }
-        filter_id_list = layer_info.get('filter_id', [])
-
-        # Convert NumPy arrays to Python lists
-        converted_filter_id_list = []
-        for fid in filter_id_list:
-            if isinstance(fid, np.ndarray):
-                converted_filter_id_list.append(fid.tolist())
-            else:
-                # If already a list, just append
-                converted_filter_id_list.append(fid)
-
-        filter_partition[layer_name] = converted_filter_id_list
+    bn_partition = raw_dict['bn_partitions']
+    num_partitions = raw_dict['num']
+    i_budget = raw_dict['initial_budget']
+    budgets = raw_dict['budgets']
+    budgets = [np.array(b, dtype=np.float64)/sum(b) for b in budgets]
+    layers = raw_dict['layers']
+    maps = raw_dict['maps']
+    input_part = np.array(raw_dict['input_partition'])
+    input_part /= input_part.sum()
     
-    # Add the 'inputs' key back to mimic the old structure. 
-    # This was present in raw_dict['partitions']['inputs'].
-    filter_partition['inputs'] = inputs
-
-    # Construct the final dict to dump
-    full_dict = {
-        'bn_partitions': bn_partition,
-        'partitions': filter_partition,
-        'maps': maps
+    if len(budgets[0]) != num_partitions:
+        raise ValueError(f"Budget length {len(budgets[0])} does not match num_partitions {num_partitions}.")
+    if len(input_part) != num_partitions:
+        raise ValueError(f"Input partitioning length {len(input_part)} does not match num_partitions {num_partitions}.")
+     
+    partition = {
+        'bn_partition': bn_partition,
+        'num': num_partitions,
+        'maps': maps,
+        'initial_budget': budgets,
+        'input_partition': input_part.tolist(),
+        'layers': layers,
     }
-
-    # Dump to YAML
-    save_path = re.sub(r'\.ya?ml$', '', configs['partition_path'])
-    save_path = save_path + f'_{epoch}.yaml'
-    with open(save_path, "w") as stream:
-        yaml.dump(full_dict, stream, Dumper=MyDumper, default_flow_style=False)
-    print(f"Partition saved to {save_path}")
-
+    
+    model_graph = fx.symbolic_trace(model)
+    node_map = build_node_map(model_graph)
+    named_mods = dict(model_graph.named_modules())
+    add_node_pairs_map = build_add_pairs(model_graph, layers, node_map)
+    
+    input_shape = None
+    for idx, name in enumerate(layers):
+        if name in model.state_dict():
+            W = model.state_dict()[name]
+            filter_id = get_partition_from_code(configs['data_code'], W.shape[0], num_partitions, budgets[idx])
+            
+            if name not in add_node_pairs_map:
+                for node in model_graph.graph.nodes:
+                    if node_map.get(node) == name:
+                        predecessor = backtrack_to_layer(node, named_mods)
+                        parent = node_map.get(predecessor) if predecessor else None
+                        if parent is None:
+                            parent = 'inputs'  # Store the first conv layer
+                            input_shape = W.shape[1]
+                partition[name] = {
+                    'filter_id': filter_id,
+                    'parents': [parent],
+                    'budget': budgets[idx]
+                }
+            else:
+                partition[name] = {
+                    'filter_id': filter_id,
+                    'parents': add_node_pairs_map[name],
+                    'budget': budgets[idx],
+                }
+            print(f"Partition information of {name}:\n", partition[name])
+                
+    # Ensure inputs node is included
+    partition['inputs'] = {'filter_id': 
+                           get_partition_from_code(configs['data_code'], input_shape, num_partitions, input_part),
+                           'input_partition': input_part.tolist()} 
+    print(f"Partition information of inputs:\n", partition['inputs'])
+    
+    partition['model_graph'] = {
+        'graph': model_graph,
+        'node_map': node_map,
+        'addition_nodes': add_node_pairs_map,
+    }
+    
+    configs['partition'] = partition
+    return configs
     
 
 def partition_generator(configs, model):
@@ -220,7 +317,51 @@ def partition_generator(configs, model):
     configs['partition'] = partition    
     return configs
 
-def get_partition_from_code(dataset, shape, ratio):
+def get_partition_from_code(dataset, shape, num_partitions, budget):
+    """
+    Distributes `shape` filters across `num_partitions` based on the given `budget`.
+
+    Args:
+        dataset (str): The dataset (not used in this function but kept for compatibility).
+        shape (int): The total number of filters (or neurons).
+        num_partitions (int): The number of partitions (machines).
+        budget (list of float): A list of size `num_partitions` where each entry represents 
+                                the proportion of filters assigned to that partition.
+                                Must sum to 1.
+
+    Returns:
+        list of np.ndarray: A list where each entry is a NumPy array containing 
+                            the indices of the filters assigned to that partition.
+    """
+    if not np.isclose(sum(budget), 1.0):
+        raise ValueError(f"Budget proportions must sum to 1, but got {sum(budget):.6f}.")
+
+    p_range = np.array(range(shape))  # Index range of filters
+    p_id = []
+    
+    # Compute absolute filter allocation per partition with rounding
+    absolute_counts = np.round(np.array(budget) * shape).astype(int)
+
+    # Ensure total allocation sums to `shape` (adjust rounding issues)
+    while absolute_counts.sum() < shape:
+        absolute_counts[np.argmax(budget)] += 1  # Add remaining filters to the largest budget
+    while absolute_counts.sum() > shape:
+        absolute_counts[np.argmin(budget)] -= 1  # Remove excess filters from the smallest budget
+
+    # Assign filters to partitions
+    start = 0
+    for count in absolute_counts:
+        p_id.append(np.array(p_range[start:start + count], dtype=int))
+        start += count
+
+    # Final check to ensure all filters are assigned correctly
+    assigned_channels = sum(len(part) for part in p_id)
+    if assigned_channels != shape:
+        raise ValueError(f"Partitioning failed: {assigned_channels} filters assigned, but expected {shape}.")
+
+    return p_id
+
+def get_partition_from_code_legacy(dataset, shape, ratio):
     p_id = []
     #if dataset == 'flash':
     #    p_len = [64, 256, 512]
@@ -244,6 +385,20 @@ def ParCalculator(i,k,m):
     return i*k+min(i, m)
 
 def set_communication_cost(model, partition):
+    """
+    Computes communication cost masks based on filter assignments.
+
+    - Uses `filter_id` of parent layers instead of `channel_id`.
+    - If the parent is `'inputs'`, it is ignored.
+    - Computes communication cost for each layer and stores it in `comm_costs`.
+
+    Args:
+        model (torch.nn.Module): The model containing the parameters.
+        partition (dict): The partitioning information, including filter assignments.
+
+    Returns:
+        dict: `comm_costs` mapping layer names to their respective communication cost tensors.
+    """
     comm_costs = {}
     device = next(model.parameters()).device
     
@@ -251,22 +406,90 @@ def set_communication_cost(model, partition):
         if name in partition:
             weight = W.cpu().detach().numpy()
             shape = weight.shape
-            
-            #cost_mask = np.ones(shape).reshape(shape[0],shape[1], -1)
-            #for i in range(partition[name]['num']):
-            #    cost_mask[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][i]] = 0
-            
-            # setup costmask according to input maps
-            cost_mask = np.zeros(shape).reshape(shape[0],shape[1], -1)
-            for i in range(partition[name]['num']):
-                for j in range(partition[name]['num']):
-                    if i==j: continue
-                    maps = partition[name]['maps'][i][j]
-                    cost_mask[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]] = maps
-                        
-            comm_costs[name] = torch.from_numpy(cost_mask.reshape(shape)).to(device)
-            
+            num_partitions = len(partition['maps'])
+            cost_mask = np.zeros(shape)
+
+            # Get the parents of this layer
+            parents = partition[name].get('parents', [])
+
+            for parent in parents:
+                if parent not in partition:
+                    raise ValueError(f"Parent {parent} not found in partition dict.")
+
+                parent_filter_ids = partition[parent]['filter_id']
+
+                for i in range(num_partitions):
+                    for j in range(num_partitions):
+                        if i == j:
+                            continue
+                        maps = partition['maps'][j][i]
+
+                        # Use parent's filter_id instead of channel_id
+                        if len(parent_filter_ids[j]) > 0:
+                            cost_mask[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]] = maps
+
+            comm_costs[name] = torch.from_numpy(cost_mask).to(device)
+
     return comm_costs
+
+def compute_comm_cost(model, partition):
+    """
+    Computes the communication cost of the model while accounting for the fact that 
+    if a machine is already computing an output filter with one input channel, 
+    additional input channels for the same output filter are free.
+
+    Args:
+        model (torch.nn.Module): The trained model.
+        partition (dict): The partitioning information.
+
+    Returns:
+        float: The total communication cost of the model.
+    """
+
+    total_comm_cost = 0
+    device = next(model.parameters()).device  # Ensure calculations happen on the correct device
+    num_machines = partition['num']
+    comm_cost_map = partition['maps']
+
+    for name, W in model.named_parameters():
+        if name in partition:
+            weight = W.cpu().detach().numpy()
+            shape = weight.shape
+            is_conv = (len(shape) == 4)  # (out_channels, in_channels, kernel_h, kernel_w)
+            
+            # Retrieve partition and cost map
+            layer_partition = partition[name]
+            outsize = layer_partition['outsize'] if 'outsize' in layer_partition else 1
+            parents = layer_partition.get('parents', [])  # Parent layers providing input
+            
+            if not parents:  # If no parents, skip communication cost computation
+                continue
+
+            # Compute the absolute sum across kernel dimensions
+            if is_conv:
+                W_flat = np.sum(np.abs(weight.reshape(shape[0], shape[1], -1)), axis=2)
+            else:  # Fully connected layer
+                W_flat = np.abs(weight)
+
+            # Iterate through all partitions and compute communication cost
+            for n in range(num_machines):  # Output filter partitions
+                for C_out in layer_partition['filter_id'][n]:  # Output filters in this partition
+                    for parent_layer in parents:
+                        if parent_layer not in partition:
+                            raise ValueError(f"Parent layer {parent_layer} not found in partition dictionary.")
+                        parent_filters = partition[parent_layer]['filter_id']
+
+                        for i in range(num_machines):  # Input partitions
+                            if i == n:
+                                continue  # Skip if input and output are on the same machine
+
+                            input_channels = parent_filters[i]
+
+                            # Check if weights between this output filter and input channels are nonzero
+                            if np.any(W_flat[C_out, input_channels]):
+                                total_comm_cost += comm_cost_map[n][i] * outsize
+
+    return total_comm_cost
 
 def featuremap_summary(model, partition, inputs):
     '''
@@ -341,3 +564,127 @@ def set_trainable_mask(model, requires_grad=False, target='weight'):
     for name, W in (model.named_parameters()):
         if target in name:
             W.requires_grad = requires_grad
+            
+            
+############################################################
+#  Graph Analysis: Pre-Scan for Add Pairs
+############################################################
+
+def backtrack_to_layer(start_node, named_mods):
+    """
+    From 'start_node', keep going backwards in the graph until we find the first
+    call_module node that is an nn.Conv2d or nn.Linear (and thus appears in our partition).
+    This accounts for BN/ReLU etc. in between.
+    
+    If no convolution is found, return None.
+    """
+    visited = set()
+    stack = [arg for arg in start_node.args if isinstance(arg, fx.Node)]
+    
+    while stack:
+        cur = stack.pop()
+        if cur in visited:
+            continue
+        visited.add(cur)
+        
+        if cur.op == "call_module":
+            submod = named_mods.get(cur.target, None)
+            if isinstance(submod, (nn.Conv2d, nn.Linear)):
+                return cur  # Return first found conv node
+        
+        for arg in cur.args:
+            if isinstance(arg, fx.Node):
+                stack.append(arg)
+    
+    return None
+
+
+def is_ancestor(nodeA, nodeB, gm):
+    """
+    Return True if nodeA is a direct or indirect ancestor of nodeB in the FX graph.
+    We do a forward traversal from nodeA, checking all nodeA.users, then their users, etc.
+    """
+    visited = set()
+    queue = [nodeA]
+    while queue:
+        current = queue.pop(0)
+        if current == nodeB:
+            return True
+        for user in current.users:
+            if user not in visited:
+                visited.add(user)
+                queue.append(user)
+    return False
+
+def find_next_layer(start_node, named_mods):
+    """
+    Traverse forward from 'start_node' to find the next nn.Conv2d or nn.Linear node.
+    If no convolution is found, return None.
+    """
+    visited = set()
+    queue = [start_node]
+    
+    while queue:
+        cur = queue.pop(0)
+        if cur in visited:
+            continue
+        visited.add(cur)
+        
+        for user in cur.users:
+            submod = named_mods.get(user.target, None)
+            if user.op == "call_module" and isinstance(submod, (nn.Conv2d, nn.Linear)):
+                return user  # Return first found conv node
+            queue.append(user)
+    
+    return None
+
+def build_add_pairs(gm, layer_names, node_map):
+    """
+    We do a pre-scan of the graph to find any add nodes and identify exactly
+    which two layer nodes feed them. We'll store them in a map:
+       layer_add_node -> (layerA, layerB)
+    """
+    add_pairs = {}  # add_node -> (layerA, layerB)
+    named_mods = dict(gm.named_modules())
+    
+    for node in gm.graph.nodes:
+        if node.op == "call_function" and node.target in (operator.add, torch.add):
+            # look for 2-arg add
+            if len(node.args) != 2:
+                continue
+            lhs, rhs = node.args
+            if not isinstance(lhs, fx.Node) or not isinstance(rhs, fx.Node):
+                continue
+
+            # backtrack each side to find layer(s)
+            lhs_layer = backtrack_to_layer(lhs, named_mods)
+            rhs_layer = backtrack_to_layer(rhs, named_mods)
+            
+            # If exactly 1 layer on each side, check if they are in partition_dict
+            if lhs_layer and rhs_layer:
+                layerA = node_map.get(lhs_layer, None)
+                layerB = node_map.get(rhs_layer, None)
+            # must be in layer_names
+            if layerA and layerB and layerA in layer_names and layerB in layer_names:
+                # Find the next layer after this addition
+                layer_after_add = find_next_layer(node, named_mods)
+                if layer_after_add:
+                    layer_after_layer = node_map.get(layer_after_add, None)
+                    if layer_after_layer:
+                        add_pairs[layer_after_layer] = [layerA, layerB]
+
+    return add_pairs
+
+
+def build_node_map(gm):
+    """
+    Return a dict: node -> 'submodule_name.weight'
+    if node is a call_module that might correspond to layer_names keys.
+    """
+    nmap = {}
+    for n in gm.graph.nodes:
+        if n.op == "call_module":
+            submod_name = n.target
+            candidate_key = submod_name + ".weight"
+            nmap[n] = candidate_key
+    return nmap

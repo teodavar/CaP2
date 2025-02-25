@@ -12,6 +12,7 @@ from torch.autograd import Variable
 from torchsummary import summary
 from torchviz import make_dot
 import torch.onnx
+import traceback
 
 class MoP:
     """
@@ -44,7 +45,7 @@ class MoP:
             # Compute Accuracy
             #criterion,_,_ = set_optimizer(self.configs, self.model, self.train_loader, self.configs['optimizer'], 
             #                              self.configs['learning_rate'], self.configs['epochs'])
-            #acc = self.test_model(self.model, criterion)
+            #test_loss, acc = self.test_model(self.model, criterion)
             
         else:
             print('standard train')
@@ -69,53 +70,123 @@ class MoP:
         if configs['create_partition']:
             # Create partition and save to yaml file
             create_partition(configs, self.model)
-        else:
-            # Config partitions and prune_ratio
-            self.configs = partition_generator(configs, self.model)
-                
-            # Compute output size of each layer
-            self.configs['partition'] = featuremap_summary(self.model, self.configs['partition'], self.input_var)
             
-            # Setup communication costs
-            self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
-            # print('Communication cost is set', self.configs['comm_costs'])
-            
-            # Calculate flops
-            calflops(self.model, self.input_var)
-            
-            # Test before prune
-            test_partition(self.model, partition=self.configs['partition'])
-            
-            # Plot model
-            # layer_id = (2,6,11,15)
-            # layer_id = (2,4)
-            # plot_layer(self.model, self.configs['partition'], layer_id=layer_id,
-            #            savepath=get_fig_path("{}".format('.'.join(configs["load_model_file"].split('.')[:-1]))))
+        # Config partitions and prune_ratio
+        self.configs = generate_partition(configs, self.model)
+
+        # Compute output size of each layer
+        self.configs['partition'] = featuremap_summary(self.model, self.configs['partition'], self.input_var)
+
+        # Setup communication costs
+        self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
+        # print('Communication cost is set', self.configs['comm_costs'])
+
+        # Calculate flops
+        calflops(self.model, self.input_var)
+
+        # Test before prune
+        test_partition_with_free_channels(self.model, partition=self.configs['partition'])
+
+        # Plot model
+        # layer_id = (2,6,11,15)
+        # layer_id = (2,4)
+        # plot_layer(self.model, self.configs['partition'], layer_id=layer_id,
+        #            savepath=get_fig_path("{}".format('.'.join(configs["load_model_file"].split('.')[:-1]))))
             
     def prune(self):
+        experiment_dir = os.path.join(self.configs['log_dir'], f"experiment_{int(time.time())}")
+        configs['experiment_dir'] = experiment_dir
+        logger = ExperimentLogger(experiment_dir)
+        start_time = time.time()
+        
         if not self.configs['plot']:
-            nepoch = self.configs['epochs']
+            nepoch = self.configs['admm_epochs']
             criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
                                                 self.configs['optimizer'], self.configs['learning_rate'], nepoch)
             
             # Initializing ADMM; if not admm, do hard pruning only
             admm = ADMM(self.configs, self.model, rho=self.configs['rho']) if self.configs['admm'] else None
+            
+            prev_W = {name: W.clone().detach() for name, W in self.model.named_parameters() if name in configs['partition']}
+            prev_Z = {name: admm.ADMM_Z[name].clone().detach() if admm else None for name, W in self.model.named_parameters() if name in configs['partition']}
+            prev_P = {name: self.configs['partition'][name]['filter_id'].copy() for name in self.configs['partition']['layers']}
+            metrics = {}
+            
+            try:
+                # prune
+                for cepoch in range(0, nepoch+1):
+                    if cepoch>0:
+                        print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
+                        metrics = standard_train(self.configs, cepoch, self.model, self.train_loader, 
+                                    criterion, optimizer, scheduler, ADMM=admm, comm=True, old_comm_loss=True)
+                        # Compute Agreement Quality ||Z - W||
+                        agreement_quality = sum(torch.norm(W - admm.ADMM_Z[name]) for name, W in self.model.named_parameters() if name in admm.ADMM_Z)
 
-            # prune
-            for cepoch in range(0, nepoch+1):
-                if cepoch>0:
-                    print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                    standard_train(self.configs, cepoch, self.model, self.train_loader, 
-                                criterion, optimizer, scheduler, ADMM=admm, comm=True)
-                acc = self.test_model(self.model, criterion, cepoch)
-                if self.configs['reassign']:
-                    save_partition(self.configs, cepoch)
+                        # Compute Convergence
+                        convergence_W = sum(torch.norm(W - prev_W[name]) for name, W in self.model.named_parameters() if name in prev_W)
+                        convergence_Z = sum(torch.norm(admm.ADMM_Z[name] - prev_Z[name]) for name, W in self.model.named_parameters() if name in prev_Z)
+                        convergence_P = compute_partition_convergence(prev_P, configs['partition'])
+
+                    test_loss, acc = self.test_model(self.model, criterion, cepoch)
+                    
+                    if self.configs['reassign']:
+                        save_partition(self.configs, cepoch, os.path.join(experiment_dir, f"partition_epoch_{cepoch}"))
+
+                    
+
+                    # Compute Communication Cost Reduction
+                    comm_cost = compute_comm_cost(self.model, self.configs['partition'])
+
+                    # Check Sparsity Constraint
+                    sparsity_W = sum(torch.sum(W == 0).item() / W.numel() for name, W in self.model.named_parameters() if name in admm.ADMM_Z)
+                    sparsity_Z = sum(torch.sum(admm.ADMM_Z[name] == 0).item() / admm.ADMM_Z[name].numel() for name in admm.ADMM_Z)
+
+                    # Validate Partition
+                    partition_validity = all(len(set(sum(part['filter_id'], []))) == len(sum(part['filter_id'], []))
+                                             for name, part in self.configs['partition'].items() 
+                                             if name in self.configs['partition']['layers'])
+
+                    logger.log(cepoch, 
+                               global_loss=metrics['batch_total_loss'].avg if cepoch > 0 else 'N/A', 
+                               train_acc=metrics['batch_loss'].avg if cepoch > 0 else 'N/A', 
+                               ML_loss=metrics['batch_loss'].avg if cepoch > 0 else 'N/A', 
+                               comm_loss=metrics['batch_comm'].avg if cepoch > 0 else 'N/A', 
+                               ADMM_loss=metrics['admm_loss'] if cepoch > 0 else 'N/A',  
+                               agreement_quality=agreement_quality if cepoch > 0 else 'N/A', 
+                               convergence_W=convergence_W if cepoch > 0 else 'N/A', 
+                               convergence_Z=convergence_Z if cepoch > 0 else 'N/A', 
+                               convergence_P=convergence_P if cepoch > 0 else 'N/A', 
+                               comm_cost=comm_cost, 
+                               constraint_sparsity_W=sparsity_W, 
+                               constraint_sparsity_Z=sparsity_Z, 
+                               partition_validity=partition_validity, 
+                               test_acc=acc,
+                               elapsed_time= time.time() - start_time
+                    )
+
+                    prev_W = {name: W.clone().detach() for name, W in self.model.named_parameters() if name in prev_W}
+                    prev_Z = {name: admm.ADMM_Z[name].clone().detach() if admm else None for name, W in self.model.named_parameters() if name in prev_Z}
+                    prev_P = {name: self.configs['partition'][name]['filter_id'].copy() for name in self.configs['partition']['layers']}
+            
+            except KeyboardInterrupt:
+                print("\nTraining interrupted. Saving progress...")
+            
+            except Exception as e:
+                print(f"\nUnexpected error encountered: {e}")
+                traceback.print_exc()  # Print the full traceback for debugging
+                raise  # Re-raise the error after printing for visibility
+            
             # hard prune
             hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
-            
+            self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
+            save_partition(self.configs, cepoch, os.path.join(experiment_dir, "partition_final"))  # Save last partition state
+            torch.save(self.model.state_dict(), os.path.join(experiment_dir, "final_model.pt"))
             # test sparsity
             test_kernel_sparsity(self.model, partition=self.configs['partition'])
-            test_partition(self.model, partition=self.configs['partition'])
+            test_partition_with_free_channels(self.model, partition=self.configs['partition'])
+            logger.save()
+            logger.plot()
+            print("Progress saved. Exiting gracefully.")
         
         else:
             self.model = get_model_from_code(self.configs).to(self.configs['device'])
@@ -153,7 +224,11 @@ class MoP:
             print("======== MODEL INFO =========")
             print(self.model)
             print("=" * 40)
-            calflops(self.model, self.input_var, self.configs['prune_ratio'])
+            prune_ratios = {}
+            pr = self.configs['prune_ratio']
+            for name, W in (model.named_parameters()):
+                prune_ratios[name] = pr
+            calflops(self.model, self.input_var, prune_ratios)
             
             # get mask
             masks = get_model_mask(model=self.model)
@@ -164,19 +239,29 @@ class MoP:
                                                 self.configs['retrain_opt'], self.configs['retrain_lr'], nepoch)
         
             best = 0
-            for cepoch in range(0, nepoch+1):
-                if cepoch>0:
-                    print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                    standard_train(self.configs, cepoch, self.model, self.train_loader, 
-                                criterion, optimizer, scheduler, masks=masks)
-                acc = self.test_model(self.model, criterion, cepoch)
-                if acc > best:
-                    best = acc
-                    save_model(self.model, get_model_path("{}".format(self.model_file)))
-                    print('Save model')
+            try:
+                for cepoch in range(0, nepoch+1):
+                    if cepoch>0:
+                        print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
+                        _ = standard_train(self.configs, cepoch, self.model, self.train_loader, 
+                                    criterion, optimizer, scheduler, masks=masks, old_comm_loss=True)
+                    test_loss, acc = self.test_model(self.model, criterion, cepoch)
+                    if acc > best:
+                        best = acc
+                        save_model(self.model, os.path.join(configs['experiment_dir'], 'fine_tuned.pt'))
+                        print('Save model')
+            except KeyboardInterrupt:
+                print("\nTraining interrupted. Saving progress...")
+            
+            # Save best accuracy in a text file
+            best_acc_path = os.path.join(self.configs['experiment_dir'], 'best_accuracy.txt')
+            with open(best_acc_path, 'w') as f:
+                f.write(f"Best Fine-Tuned Accuracy: {best:.4f}%\n")
+
+            print(f"✅ Best accuracy logged at: {best_acc_path}")
             
             test_kernel_sparsity(self.model, partition=self.configs['partition'])
-            test_partition(self.model, partition=self.configs['partition'])
+            test_partition_with_free_channels(self.model, partition=self.configs['partition'])
         else:
             pass
     
@@ -195,9 +280,9 @@ class MoP:
         for cepoch in range(0, nepoch+1):
             if cepoch>0:
                 print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                standard_train(self.configs, cepoch, self.model, self.train_loader, criterion, 
-                               optimizer, scheduler, ADMM=admm, comm=True)
-            acc = self.test_model(self.model, criterion, cepoch)
+                _ = standard_train(self.configs, cepoch, self.model, self.train_loader, criterion, 
+                               optimizer, scheduler, ADMM=admm, comm=True, old_comm_loss=True)
+            test_loss, acc = self.test_model(self.model, criterion, cepoch)
             
         # hard prune
         hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
@@ -226,9 +311,9 @@ class MoP:
         for cepoch in range(0, nepoch+1):
             if cepoch>0:
                 print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                standard_train(self.configs, cepoch, self.model_r, self.train_loader, 
-                               criterion, optimizer, scheduler, masks=masks)
-            acc = self.test_model(self.model_r, criterion, cepoch)
+                _ = standard_train(self.configs, cepoch, self.model_r, self.train_loader, 
+                               criterion, optimizer, scheduler, masks=masks, old_comm_loss=True)
+            test_loss, acc = self.test_model(self.model_r, criterion, cepoch)
             if acc > best:
                 best = acc
                 save_model(self.model_r, get_model_path("{}".format(self.model_file)))
@@ -243,9 +328,9 @@ class MoP:
         for cepoch in range(0, nepoch+1):
             if cepoch>0:
                 print('Learning rate: {:.4f}'.format(get_lr(optimizer)))
-                standard_train(self.configs, cepoch, self.model, self.train_loader, criterion, optimizer, scheduler)
+                _ = standard_train(self.configs, cepoch, self.model, self.train_loader, criterion, optimizer, scheduler)
                 
-            acc = self.test_model(self.model, criterion, cepoch)
+            test_loss, acc = self.test_model(self.model, criterion, cepoch)
             if acc > best:
                 best = acc
                 # save_model(self.model, get_model_path("{}".format(self.model_file.split('.')[0]+'.pt')))
@@ -254,6 +339,6 @@ class MoP:
                 print('Save model')
                 
     def test_model(self, model, criterion, cepoch=0):
-        acc = self.evalHelper.get_accuracy(model, self.test_loader, criterion, cepoch)
-        return acc
+        test_loss, acc = self.evalHelper.get_accuracy(model, self.test_loader, criterion, cepoch)
+        return test_loss, acc
     

@@ -1,48 +1,10 @@
 bn_partitions: [4, 4, 4, 4, 4, 4, 4, 4, 4]
-maps:
-  conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  inputs: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer1.0.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer1.0.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer1.1.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer1.1.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer2.0.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer2.0.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer2.0.shortcut.0.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1,
-      0]]
-  layer2.1.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer2.1.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer3.0.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer3.0.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer3.0.shortcut.0.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1,
-      0]]
-  layer3.1.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer3.1.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer4.0.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer4.0.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer4.0.shortcut.0.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1,
-      0]]
-  layer4.1.conv1.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-  layer4.1.conv2.weight: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
-partitions:
-  conv1.weight: [1, 1, 1, 1]
-  inputs: [1, 1, 1, 1]
-  layer1.0.conv1.weight: [1, 1, 1, 1]
-  layer1.0.conv2.weight: [1, 1, 1, 1]
-  layer1.1.conv1.weight: [1, 1, 1, 1]
-  layer1.1.conv2.weight: [1, 1, 1, 1]
-  layer2.0.conv1.weight: [1, 1, 1, 1]
-  layer2.0.conv2.weight: [1, 1, 1, 1]
-  layer2.0.shortcut.0.weight: [1, 1, 1, 1]
-  layer2.1.conv1.weight: [1, 1, 1, 1]
-  layer2.1.conv2.weight: [1, 1, 1, 1]
-  layer3.0.conv1.weight: [1, 1, 1, 1]
-  layer3.0.conv2.weight: [1, 1, 1, 1]
-  layer3.0.shortcut.0.weight: [1, 1, 1, 1]
-  layer3.1.conv1.weight: [1, 1, 1, 1]
-  layer3.1.conv2.weight: [1, 1, 1, 1]
-  layer4.0.conv1.weight: [1, 1, 1, 1]
-  layer4.0.conv2.weight: [1, 1, 1, 1]
-  layer4.0.shortcut.0.weight: [1, 1, 1, 1]
-  layer4.1.conv1.weight: [1, 1, 1, 1]
-  layer4.1.conv2.weight: [1, 1, 1, 1]
+budget: [1, 1, 1, 1]
+input_partition: [1, 1, 1, 1]
+layers: [inputs, conv1.weight, layer1.0.conv1.weight, layer1.0.conv2.weight, layer1.1.conv1.weight,
+  layer1.1.conv2.weight, layer2.0.conv1.weight, layer2.0.conv2.weight, layer2.0.shortcut.0.weight,
+  layer2.1.conv1.weight, layer2.1.conv2.weight, layer3.0.conv1.weight, layer3.0.conv2.weight,
+  layer3.0.shortcut.0.weight, layer3.1.conv1.weight, layer3.1.conv2.weight, layer4.0.conv1.weight,
+  layer4.0.conv2.weight, layer4.0.shortcut.0.weight, layer4.1.conv1.weight, layer4.1.conv2.weight]
+maps: [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0]]
+num: 4

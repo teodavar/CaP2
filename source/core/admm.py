@@ -42,7 +42,7 @@ class ADMM:
             if name in self.partition:
                 #counter += 1
                 #if not self.par_first_layer and counter==1: continue
-                self.prune_ratios[name] = self.prune_ratio[name]
+                self.prune_ratios[name] = self.prune_ratio
         
         # setup rho
         for k, v in self.prune_ratios.items():
@@ -125,6 +125,12 @@ def weight_pruning(weight, name, prune_ratio, sparsity_type, cross_x=4, cross_f=
     #percent = prune_ratio * 100 * args.ratioexp
     percent = prune_ratio * 100
     
+    parents = partition[name].get('parents', [])
+    for parent in parents: 
+        if parent not in partition:
+            raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
+
+    
     if (sparsity_type == "irregular"):
         weight_temp = np.abs(
             weight)  # a buffer that holds weights with absolute values
@@ -177,7 +183,7 @@ def weight_pruning(weight, name, prune_ratio, sparsity_type, cross_x=4, cross_f=
             expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
 
     elif (sparsity_type == 'partition'):
-        num_partition = partition[name]['num']
+        num_partition = partition['num']
         shape = weight.shape
         weight3d = weight.reshape(shape[0], shape[1], -1)
         zero3d = np.zeros(shape).reshape(shape[0],shape[1], -1)
@@ -191,6 +197,42 @@ def weight_pruning(weight, name, prune_ratio, sparsity_type, cross_x=4, cross_f=
         
         weight = zero3d.reshape(shape)
         return num_partition, torch.from_numpy(weight).float().to(device)    
+
+    elif sparsity_type == "partition_row":
+        num_partitions = partition['num']
+        shape = weight.shape
+        weight3d = weight.reshape(shape[0], shape[1], -1)  # Preserve (out_channels, in_channels)
+
+        for dst in range(num_partitions):  # Destination machines handling output filters
+            output_filters = partition[name]['filter_id'][dst]  # Output filters at this machine
+
+            for src in range(num_partitions):  # Source machines providing input channels
+                if src == dst:
+                    continue  # Skip intra-machine connections
+
+                # Gather input channels from all parents of this layer for src machine
+                input_channels = []
+                if len(parents) == 1:
+                    input_channels = partition[parents[0]]['filter_id'][src]  # Directly use the array
+                else:
+                    input_channels = np.concatenate([partition[parent]['filter_id'][src] for parent in parents])
+                    input_channels = np.unique(input_channels)  # Remove duplicates
+                
+                if len(output_filters) == 0 or len(input_channels) == 0:
+                    continue  # Skip if no filters or inputs in this partition
+
+                # Compute L2 norms for only (output filter, input channel) pairs in this (src -> dst) relation
+                submatrix = weight3d[np.ix_(output_filters, input_channels)]  # Extract relevant connections
+                row_l2_norm = LA.norm(submatrix, axis=1)  # Compute per-output filter norm
+
+                if row_l2_norm.size > 0:
+                    percentile = np.percentile(row_l2_norm, percent)  # Get threshold
+                    under_threshold = row_l2_norm < percentile  # Identify pruned connections
+
+                    # Zero out connections **only for src's input channels** at the selected output filters
+                    weight3d[np.ix_(output_filters, input_channels)] = np.where(under_threshold[:, None], 0, submatrix)
+
+        return num_partitions, torch.from_numpy(weight3d.reshape(shape)).to(device)
     
     elif (sparsity_type == 'kernel'):
         shape = weight.shape
@@ -264,7 +306,7 @@ def hard_prune(ADMM, model, sparsity_type, option=None, cross_x=4, cross_f=1):
         elif option == "l1":
             _, cuda_pruned_weights = L1_pruning(W,ADMM.prune_ratios[name],sparsity_type)
         else:
-            raise Exception("not implmented yet")
+            raise Exception("not implemented yet")
         W.data = cuda_pruned_weights  # replace the data field in variable
 
 
@@ -333,10 +375,12 @@ def append_admm_loss(ADMM, model, ce_loss):
     
     mixed_loss = 0
     mixed_loss += ce_loss
+    total_admm_loss = 0
     for k, v in admm_loss.items():
         mixed_loss += v
+        total_admm_loss += v
     #print('admm_loss: ', mixed_loss)
-    return ce_loss, admm_loss, mixed_loss
+    return ce_loss, total_admm_loss, mixed_loss
 
 
 def admm_multi_rho_scheduler(ADMM, name):
@@ -380,4 +424,41 @@ Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
+        
+
+import numpy as np
+
+def compute_partition_convergence(prev_P, partition):
+    """
+    Computes convergence for partition filter assignments (P) by comparing
+    the previous filter assignments (prev_P) with the current ones.
+
+    This measures the number of filters that changed machines across all partitions.
+
+    Args:
+        prev_P (dict): Previous partition assignments {'layer_name': [[filters for each machine]]}.
+        partition (dict): Current partition assignments {'layer_name': {'filter_id': [[filters per machine]]}}.
+
+    Returns:
+        float: The total number of filters that changed assignments.
+    """
+    convergence_P = 0
+
+    for name in prev_P:
+        if name in partition:
+            prev_filters = prev_P[name]  # List of lists (each list is a machine)
+            curr_filters = partition[name]['filter_id']  # List of lists (each list is a machine)
+
+            # Ensure both have the same number of partitions (machines)
+            if len(prev_filters) != len(curr_filters):
+                raise ValueError(f"Mismatch in partition sizes for {name}: {len(prev_filters)} vs {len(curr_filters)}")
+
+            # Compute filter changes per machine
+            for prev_set, curr_set in zip(prev_filters, curr_filters):
+                prev_set, curr_set = set(prev_set), set(curr_set)
+                changes = len(prev_set.symmetric_difference(curr_set))  # Count changed filters
+                convergence_P += changes  # Sum changes across machines
+
+    return convergence_P
+
 
