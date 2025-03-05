@@ -95,7 +95,7 @@ class MoP:
             
     def prune(self):
         experiment_dir = os.path.join(self.configs['log_dir'], f"experiment_{int(time.time())}")
-        configs['experiment_dir'] = experiment_dir
+        self.configs['experiment_dir'] = experiment_dir
         logger = ExperimentLogger(experiment_dir)
         start_time = time.time()
         
@@ -107,8 +107,8 @@ class MoP:
             # Initializing ADMM; if not admm, do hard pruning only
             admm = ADMM(self.configs, self.model, rho=self.configs['rho']) if self.configs['admm'] else None
             
-            prev_W = {name: W.clone().detach() for name, W in self.model.named_parameters() if name in configs['partition']}
-            prev_Z = {name: admm.ADMM_Z[name].clone().detach() if admm else None for name, W in self.model.named_parameters() if name in configs['partition']}
+            prev_W = {name: W.clone().detach() for name, W in self.model.named_parameters() if name in self.configs['partition']}
+            prev_Z = {name: admm.ADMM_Z[name].clone().detach() if admm else None for name, W in self.model.named_parameters() if name in self.configs['partition']}
             prev_P = {name: self.configs['partition'][name]['filter_id'].copy() for name in self.configs['partition']['layers']}
             metrics = {}
             
@@ -125,7 +125,7 @@ class MoP:
                         # Compute Convergence
                         convergence_W = sum(torch.norm(W - prev_W[name]) for name, W in self.model.named_parameters() if name in prev_W)
                         convergence_Z = sum(torch.norm(admm.ADMM_Z[name] - prev_Z[name]) for name, W in self.model.named_parameters() if name in prev_Z)
-                        convergence_P = compute_partition_convergence(prev_P, configs['partition'])
+                        convergence_P = compute_partition_convergence(prev_P, self.configs['partition'])
 
                     test_loss, acc = self.test_model(self.model, criterion, cepoch)
                     
@@ -142,9 +142,11 @@ class MoP:
                     sparsity_Z = sum(torch.sum(admm.ADMM_Z[name] == 0).item() / admm.ADMM_Z[name].numel() for name in admm.ADMM_Z)
 
                     # Validate Partition
-                    partition_validity = all(len(set(sum(part['filter_id'], []))) == len(sum(part['filter_id'], []))
+                    partition_validity = all(len(set(np.concatenate(part['filter_id']))) == len(np.concatenate(part['filter_id']))
                                              for name, part in self.configs['partition'].items() 
                                              if name in self.configs['partition']['layers'])
+                                         
+                                     
 
                     logger.log(cepoch, 
                                global_loss=metrics['batch_total_loss'].avg if cepoch > 0 else 'N/A', 
@@ -159,7 +161,8 @@ class MoP:
                                comm_cost=comm_cost, 
                                constraint_sparsity_W=sparsity_W, 
                                constraint_sparsity_Z=sparsity_Z, 
-                               partition_validity=partition_validity, 
+                               partition_validity=partition_validity,
+                               test_loss=test_loss,
                                test_acc=acc,
                                elapsed_time= time.time() - start_time
                     )
@@ -226,7 +229,7 @@ class MoP:
             print("=" * 40)
             prune_ratios = {}
             pr = self.configs['prune_ratio']
-            for name, W in (model.named_parameters()):
+            for name, W in (self.model.named_parameters()):
                 prune_ratios[name] = pr
             calflops(self.model, self.input_var, prune_ratios)
             
@@ -248,7 +251,7 @@ class MoP:
                     test_loss, acc = self.test_model(self.model, criterion, cepoch)
                     if acc > best:
                         best = acc
-                        save_model(self.model, os.path.join(configs['experiment_dir'], 'fine_tuned.pt'))
+                        save_model(self.model, os.path.join(self.configs['experiment_dir'], 'fine_tuned.pt'))
                         print('Save model')
             except KeyboardInterrupt:
                 print("\nTraining interrupted. Saving progress...")

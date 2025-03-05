@@ -2,7 +2,7 @@ device: cuda
 model: resnet18
 data_code: cifar10
 num_classes: 10
-log_dir: ./experiment_logs
+log_dir: ./experiment_logs/Resnet18-NoPart-CostMatrix
 
 epochs: 300
 batch_size: 128
@@ -11,18 +11,18 @@ lr_scheduler : default
 learning_rate: 0.01
 seed: 1234
 
-sparsity_type: partition_row
-prune_ratios: 0.75
+sparsity_type: kernel
+prune_ratio: [0,0.5,0.75,0.85]
 admm: True
-admm_epochs: 100
+admm_epochs: 50
 rho: 0.0001
 multi_rho: True
 retrain_bs: 128
 retrain_lr: 0.001
 retrain_ep: 50
 retrain_opt: default
-reassign: True
-reassign_freq: 2
+reassign: False
+reassign_freq: 5
 budget: [1,1,1,1]
 input_partition: [1,1,1,1]
 

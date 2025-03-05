@@ -63,6 +63,8 @@ def load_state_dict(model, state_dict, bn_par=False, partition={}):
 #def load_bn(param, num_partition=1):
     
 def get_model_path(filename, idx=None):
+    if 'fine_tuned.pt' in filename:
+        return filename
     filepath = os.path.join(os.getcwd(), 'assets', 'models', filename)
     return filepath
 

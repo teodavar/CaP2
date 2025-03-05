@@ -22,7 +22,7 @@ prune_finetune() {
     log_name=${dataset}-${model}-$(date +"%Y-%m-%d_%H:%M:%S")
     python -m source.core.run_partition \
            -cfg config/${dataset}.yaml \
-           >logs/${log_name}.out
+           >experiment_logs/${log_name}.out
 }
 
 prune_finetune

@@ -247,6 +247,7 @@ def update_assignments(model, configs):
             if (layer_key in partition_dict) and isinstance(submod, (nn.Conv2d, nn.Linear)):
                     w = model.state_dict()[layer_key]
                     cost_mat = compute_cost_matrix(layer_key, w, partition_dict)
+                    assert len(configs['partition'][layer_key]['budget']) > 0, "Error: Budget list is empty!"
                     sol = computeassignment_scipy(cost_mat, configs['partition'][layer_key]['budget'])
                     sol.sort(key=lambda x: x[0])
                     assigns = [m for (ch, m, c) in sol]

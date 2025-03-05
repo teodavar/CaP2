@@ -102,8 +102,8 @@ def save_partition(configs, epoch=0, save_path=None):
     for layer in partition_copy:
         if isinstance(partition_copy[layer], dict) and 'filter_id' in partition_copy[layer]:
             partition_copy[layer]['filter_id'] = [sublist.tolist() for sublist in partition_copy[layer]['filter_id'] if isinstance(sublist, np.ndarray)]
-        if isinstance(partition_copy[layer], dict) and 'budget' in partition_copy[layer]:
-            partition_copy[layer]['budget'] = [sublist.tolist() for sublist in partition_copy[layer]['budget'] if isinstance(sublist, np.ndarray)]
+        if isinstance(partition_copy[layer], dict) and 'budget' in partition_copy[layer] and isinstance(partition_copy[layer]['budget'], np.ndarray):
+            partition_copy[layer]['budget'] = partition_copy[layer]['budget'].tolist()
         if isinstance(partition_copy[layer], np.ndarray):
             partition_copy[layer] = partition_copy[layer].tolist()
             
@@ -158,7 +158,7 @@ def generate_partition(configs, model):
     budgets = [np.array(b, dtype=np.float64)/sum(b) for b in budgets]
     layers = raw_dict['layers']
     maps = raw_dict['maps']
-    input_part = np.array(raw_dict['input_partition'])
+    input_part = np.array(raw_dict['input_partition'], dtype=np.float64)
     input_part /= input_part.sum()
     
     if len(budgets[0]) != num_partitions:
@@ -170,7 +170,7 @@ def generate_partition(configs, model):
         'bn_partition': bn_partition,
         'num': num_partitions,
         'maps': maps,
-        'initial_budget': budgets,
+        'initial_budget': i_budget,
         'input_partition': input_part.tolist(),
         'layers': layers,
     }
@@ -181,7 +181,7 @@ def generate_partition(configs, model):
     add_node_pairs_map = build_add_pairs(model_graph, layers, node_map)
     
     input_shape = None
-    for idx, name in enumerate(layers):
+    for idx, name in enumerate(layers[1:]):
         if name in model.state_dict():
             W = model.state_dict()[name]
             filter_id = get_partition_from_code(configs['data_code'], W.shape[0], num_partitions, budgets[idx])

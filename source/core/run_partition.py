@@ -173,7 +173,7 @@ def main():
     # if args.sparsity_type:
     if 'sparsity_type' not in config_dict and args.sparsity_type:
         config_dict['sparsity_type'] = args.sparsity_type
-    if args.prune_ratio or args.prune_ratio == 0:
+    if 'prune_ratio' not in config_dict and (args.prune_ratio or args.prune_ratio) == 0:
     # if 'prune_ratio' not in config_dict and args.prune_ratio:
         config_dict['prune_ratio'] = args.prune_ratio
     # if args.rho:
@@ -252,25 +252,72 @@ def main():
 if __name__ == "__main__":
     configs = main()
     print(configs)
-    mop = MoP(configs)
-    if not configs['create_partition'] and not configs['load_pruned_model']:
-        configs['plot'] = False
-        mop.prune()
-        mop.finetune()
-    elif configs['load_pruned_model']:
-        # Run accuracy test
-        # Run timing test
-        # pruned model file is: configs['load_pruned_model_file']
-        model = get_model_from_code(configs).to(configs['device'])
-        state_dict = torch.load(get_model_path_split("{}".format(configs["load_pruned_model_file"])), map_location=configs['device'])
-        model = load_state_dict(model, 
-                                        state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
-                                        else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
+    
+    # 1) If 'prune_ratio' is a single float, run exactly as before
+    if isinstance(configs['prune_ratio'], (int, float)):
+        mop = MoP(configs)
+        if not configs['create_partition'] and not configs['load_pruned_model']:
+            configs['plot'] = False
+            mop.prune()
+            mop.finetune()
+        elif configs['load_pruned_model']:
+            # Run accuracy/timing test on the loaded pruned model
+            model = get_model_from_code(configs).to(configs['device'])
+            state_dict = torch.load(get_model_path_split("{}".format(configs["load_pruned_model_file"])), 
+                                    map_location=configs['device'])
+            model = load_state_dict(model, 
+                                    state_dict['model_state_dict'] if 'model_state_dict' in state_dict 
+                                    else state_dict['state_dict'] if 'state_dict' in state_dict else state_dict,)
+            # Evaluate your pruned model as needed
+        # mop.pruneMask()
+        # mop.finetuneWeight()
 
+    # 2) Else if 'prune_ratio' is a list, run progressive pruning
+    elif isinstance(configs['prune_ratio'], list):
+        # We'll store the original ADMM epochs to decrease them each iteration
+        original_admm_epochs = configs['admm_epochs']
+        # Example: if we want to linearly scale down epochs, we’ll do so as an example
+        # For N ratios, iteration i => use int(original_admm_epochs * (1 - i/N*0.7)) e.g.
+        # Adjust the factor to your desired schedule
+        original_prs = configs['prune_ratio'].copy()
+
+        for i, pr_ratio in enumerate(original_prs):
+            print(f"\n=== Progressive Step {i+1} / {len(original_prs)}  |  Prune ratio: {pr_ratio} ===")
+
+            # Decrease ADMM epochs for each subsequent ratio (example logic)
+            # You can adjust the factor as you wish:
+            progressive_factor = 0.7  # 30% fewer epochs at the final iteration
+            fraction = (1 - progressive_factor * (i / (len(original_prs) - 1))) if len(original_prs) > 1 else 1
+            configs['admm_epochs'] = max(1, int(original_admm_epochs * fraction))
+
+            # Set the new prune ratio
+            configs['prune_ratio'] = pr_ratio
+
+            # Build a new MoP object
+            mop = MoP(configs)
+
+            # 2A) Prune
+            configs['plot'] = False
+            mop.prune()
+
+            # 2B) Finetune
+            mop.finetune()
+
+            # 2C) The engine saves the final finetuned model to:
+            #     mop.configs['experiment_dir'] + '/fine_tuned.pt'
+            #     or 'final_model.pt' (depending on which you want to chain).
+            #     We'll choose 'fine_tuned.pt' as the next "dense" model
+
+            fine_tuned_model_path = os.path.join(mop.configs['experiment_dir'], 'fine_tuned.pt')
+            # Or 'final_model.pt' if you want to chain the pruned model instead
+
+            # 2D) Update 'load_dense_model' so the next iteration uses that fine-tuned model
+            if i < len(original_prs) - 1:
+                configs['load_dense_model'] = True
+                configs['load_dense_model_file'] = fine_tuned_model_path
+
+        print("\n🎉 Finished progressive pruning & fine-tuning for all ratios.")
+
+    else:
+        raise ValueError(f"'prune_ratio' must be float/int or list, but got: {type(configs['prune_ratio'])}")
         
-           
-
-
-
-    # mop.pruneMask()
-    # mop.finetuneWeight()
