@@ -1,4 +1,5 @@
 import torch
+import wandb
 import numpy as np
 import os
 import time
@@ -122,8 +123,9 @@ def format_metric(value, suffix=""):
     return f"{value:.4f}{suffix}" if isinstance(value, (int, float)) else value
     
 class ExperimentLogger:
-    def __init__(self, experiment_dir):
+    def __init__(self, experiment_dir, use_wandb=False):
         self.experiment_dir = experiment_dir
+        self.use_wandb = use_wandb
         os.makedirs(experiment_dir, exist_ok=True)
         
         self.logs = {
@@ -143,13 +145,20 @@ class ExperimentLogger:
             'partition_validity': [],
             'test_loss': [], 
             'test_acc': [],
+            'P_costs': [],
             'elapsed_time': [],
         }
 
     def log(self, epoch, **kwargs):
         self.logs['epoch'].append(epoch)
+        P_avg = 'N/A'
         for key, value in kwargs.items():
-            self.logs[key].append(value)
+            if key == 'P_costs':
+                if value != 'N/A' and len(value) > 0:
+                    self.logs[key].extend(value)
+                    P_avg = np.mean(value)
+            else:
+                self.logs[key].append(value)
         
         # Print metrics at the end of each epoch
         print(f"\n📌 **Epoch {epoch} Summary**:")
@@ -157,6 +166,7 @@ class ExperimentLogger:
         print(f"    ➤ Train Accuracy: {format_metric(kwargs.get('train_acc', 'N/A'), '%')}")
         print(f"    ➤ ML Loss: {format_metric(kwargs.get('ML_loss', 'N/A'))}")
         print(f"    ➤ Comm Loss: {format_metric(kwargs.get('comm_loss', 'N/A'))}")
+        print(f"    ➤ P Average Cost: {format_metric(P_avg)}")
         print(f"    ➤ ADMM Loss: {format_metric(kwargs.get('ADMM_loss', 'N/A'))}")
         print(f"    ➤ Agreement Quality: {format_metric(kwargs.get('agreement_quality', 'N/A'))}")
         print(f"    ➤ Convergence W: {format_metric(kwargs.get('convergence_W', 'N/A'))}")
@@ -169,13 +179,29 @@ class ExperimentLogger:
         print(f"    ➤ Test Loss: {format_metric(kwargs.get('test_loss', 'N/A'))}")
         print(f"    ➤ Test Accuracy: {format_metric(kwargs.get('test_acc', 'N/A'), '%')}")
         print(f"    🕒 Elapsed Time: {format_metric(kwargs.get('elapsed_time', 'N/A'), 's')}")
+        
+        # wandb logging
+        if self.use_wandb:
+            print("Logging metrics to wandb")
+            log_dict = {}
+            for k, v in kwargs.items():
+                if v != "N/A" and k != "P_costs":
+                    if isinstance(v, torch.Tensor):
+                        v = v.detach().cpu().item()
+                    log_dict[k] = v
+            log_dict['epoch'] = epoch
+            wandb.log(log_dict, step=epoch+1)
 
     def save(self):
         for key, value in self.logs.items():
             # Handle PyTorch tensors (detach, move to CPU, convert to numpy, then to list)
             self.logs[key] = [v.detach().cpu().item() if isinstance(v, torch.Tensor) else v for v in value]
             
-        df = pd.DataFrame(self.logs)
+        # Exclude 'P_costs' from logs before saving
+        logs_filtered = {k: v for k, v in self.logs.items() if k != "P_costs"}
+
+        # Convert to DataFrame and save
+        df = pd.DataFrame(logs_filtered)
         df.to_csv(os.path.join(self.experiment_dir, "metrics.csv"), index=False)
 
     def plot(self):
@@ -222,3 +248,25 @@ class ExperimentLogger:
             plt.grid()
             plt.savefig(os.path.join(self.experiment_dir, f"{key}.png"))
             plt.close()
+            
+        # Special case: Handling "P_costs"
+        if 'P_costs' in self.logs and len(self.logs['P_costs']) > 0:
+            print("Processing P_costs...")
+
+            # Convert P_costs into a NumPy array
+            P_costs_array = np.array(self.logs['P_costs'])
+
+            # Ensure it's a 1D list before plotting
+            if P_costs_array.ndim == 1:
+                plt.figure(figsize=(10, 5))
+                plt.plot(range(len(P_costs_array)), P_costs_array, label="P_costs", linestyle='-', marker='.')
+                plt.xlabel("Batch Index")
+                plt.ylabel("P Matrix Cost")
+                plt.title("P Assignment Cost over Training")
+                plt.legend()
+                plt.grid()
+                plt.savefig(os.path.join(self.experiment_dir, "P_costs.png"))
+                plt.close()
+
+            else:
+                print("Unexpected format for P_costs, skipping plot.")

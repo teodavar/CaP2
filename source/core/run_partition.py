@@ -2,6 +2,7 @@ from .. import *
 from . import *
 from .engine import *
 from os import environ
+import wandb
 
 def get_args():
     """ args from input
@@ -240,11 +241,15 @@ def main():
         config_dict['lambda_comm'] = int(config_dict['lambda_comm'])
 
     config_dict['load_pruned_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}-{config_dict['sparsity_type']}-np{config_dict['num_partition']}-pr{config_dict['prune_ratio']}-lcm{config_dict['lambda_comm']}.pt"
-    config_dict['partition_path'] = f"config/{config_dict['model']}-np{config_dict['num_partition']}.yaml"
+    config_dict['partition_path'] = f"config/{config_dict['model']}-np{config_dict['num_partition']}-{config_dict['experiment_name']}.yaml"
     config_dict['load_dense_model_file'] = f"{config_dict['data_code']}-{config_dict['model']}.pt"
     
     for key, val in config_dict.items():
         print(key, ': ', val)
+        
+    # We add an additional flag to keep track of wandb usage
+    if 'use_wandb' not in config_dict:
+        config_dict['use_wandb'] = False
         
     return config_dict
    
@@ -277,21 +282,35 @@ if __name__ == "__main__":
         # We'll store the original ADMM epochs to decrease them each iteration
         original_admm_epochs = configs['admm_epochs']
         # Example: if we want to linearly scale down epochs, we’ll do so as an example
-        # For N ratios, iteration i => use int(original_admm_epochs * (1 - i/N*0.7)) e.g.
+        # For N ratios, iteration i => use int(original_admm_epochs * (1 - i/N*0.8)) e.g.
         # Adjust the factor to your desired schedule
         original_prs = configs['prune_ratio'].copy()
 
         for i, pr_ratio in enumerate(original_prs):
             print(f"\n=== Progressive Step {i+1} / {len(original_prs)}  |  Prune ratio: {pr_ratio} ===")
-
             # Decrease ADMM epochs for each subsequent ratio (example logic)
             # You can adjust the factor as you wish:
-            progressive_factor = 0.7  # 30% fewer epochs at the final iteration
+            progressive_factor = 0.0  # 20% fewer epochs at the final iteration
             fraction = (1 - progressive_factor * (i / (len(original_prs) - 1))) if len(original_prs) > 1 else 1
             configs['admm_epochs'] = max(1, int(original_admm_epochs * fraction))
 
             # Set the new prune ratio
             configs['prune_ratio'] = pr_ratio
+            
+            # Set experiment ID
+            experiment_flag = configs['experiment_name'] if 'experiment_name' in configs else "uniform"
+            reassign_flag = f"rsgn{configs['reassign_freq']}" if configs['reassign'] else "fixed"
+            experiment_id = f"{configs['data_code']}_{configs['model']}_pr{pr_ratio}_np{configs['num_partition']}_{configs['sparsity_type']}_{experiment_flag}_{reassign_flag}"
+            
+            configs['experiment_dir'] = os.path.join(configs['log_dir'], experiment_id)
+            
+            if configs.get('use_wandb', False):
+                wandb.init(
+                    project=configs.get('wandb_project', "DefaultProject"),
+                    entity=configs.get('wandb_entity', None),
+                    name=experiment_id,
+                    config={k: v for k, v in configs.items() if k != "partition"},
+                )
 
             # Build a new MoP object
             mop = MoP(configs)
@@ -299,7 +318,7 @@ if __name__ == "__main__":
             # 2A) Prune
             configs['plot'] = False
             mop.prune()
-
+            
             # 2B) Finetune
             mop.finetune()
 
@@ -315,6 +334,10 @@ if __name__ == "__main__":
             if i < len(original_prs) - 1:
                 configs['load_dense_model'] = True
                 configs['load_dense_model_file'] = fine_tuned_model_path
+            
+            # 3) Finish the run
+            if configs.get('use_wandb', False):
+                wandb.finish()
 
         print("\n🎉 Finished progressive pruning & fine-tuning for all ratios.")
 

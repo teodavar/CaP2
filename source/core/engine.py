@@ -8,6 +8,7 @@ from ..utils.calculate_flops.calflops import calflops
 from .admm import *
 
 import time
+import wandb
 from torch.autograd import Variable
 from torchsummary import summary
 from torchviz import make_dot
@@ -85,7 +86,7 @@ class MoP:
         calflops(self.model, self.input_var)
 
         # Test before prune
-        test_partition_with_free_channels(self.model, partition=self.configs['partition'])
+        test_partition_with_free_channels(self.model, partition=self.configs['partition'], use_wandb=self.configs['use_wandb'], epoch=0)
 
         # Plot model
         # layer_id = (2,6,11,15)
@@ -94,9 +95,10 @@ class MoP:
         #            savepath=get_fig_path("{}".format('.'.join(configs["load_model_file"].split('.')[:-1]))))
             
     def prune(self):
-        experiment_dir = os.path.join(self.configs['log_dir'], f"experiment_{int(time.time())}")
-        self.configs['experiment_dir'] = experiment_dir
-        logger = ExperimentLogger(experiment_dir)
+        experiment_dir = self.configs['experiment_dir'] if 'experiment_dir' in self.configs else os.path.join(self.configs['log_dir'], f"experiment_{int(time.time())}")
+        if 'experiment_dir' not in self.configs: 
+            self.configs['experiment_dir'] = experiment_dir
+        logger = ExperimentLogger(experiment_dir, use_wandb=self.configs.get('use_wandb', False))
         start_time = time.time()
         
         if not self.configs['plot']:
@@ -131,6 +133,11 @@ class MoP:
                     
                     if self.configs['reassign']:
                         save_partition(self.configs, cepoch, os.path.join(experiment_dir, f"partition_epoch_{cepoch}"))
+                        if self.configs.get('use_wandb', False) and cepoch==0:
+                            artifact = wandb.Artifact(name="initial_partition", type="config")
+                            artifact.add_file(os.path.join(experiment_dir, f"partition_epoch_{cepoch}"))
+                            wandb.log_artifact(artifact)
+                            
 
                     
 
@@ -164,6 +171,7 @@ class MoP:
                                partition_validity=partition_validity,
                                test_loss=test_loss,
                                test_acc=acc,
+                               P_costs=metrics['P_costs'] if cepoch > 0 else 'N/A',
                                elapsed_time= time.time() - start_time
                     )
 
@@ -183,10 +191,14 @@ class MoP:
             hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
             self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
             save_partition(self.configs, cepoch, os.path.join(experiment_dir, "partition_final"))  # Save last partition state
+            if self.configs.get('use_wandb', False):
+                artifact = wandb.Artifact(name="final_partition", type="config")
+                artifact.add_file(os.path.join(experiment_dir, f"partition_final"))
+                wandb.log_artifact(artifact)
             torch.save(self.model.state_dict(), os.path.join(experiment_dir, "final_model.pt"))
             # test sparsity
             test_kernel_sparsity(self.model, partition=self.configs['partition'])
-            test_partition_with_free_channels(self.model, partition=self.configs['partition'])
+            test_partition_with_free_channels(self.model, partition=self.configs['partition'], use_wandb=self.configs['use_wandb'], epoch=nepoch+2)
             logger.save()
             logger.plot()
             print("Progress saved. Exiting gracefully.")
@@ -260,11 +272,14 @@ class MoP:
             best_acc_path = os.path.join(self.configs['experiment_dir'], 'best_accuracy.txt')
             with open(best_acc_path, 'w') as f:
                 f.write(f"Best Fine-Tuned Accuracy: {best:.4f}%\n")
+            
+            if self.configs.get('use_wandb', False):
+                wandb.log({"best_acc": best})
 
             print(f"✅ Best accuracy logged at: {best_acc_path}")
             
             test_kernel_sparsity(self.model, partition=self.configs['partition'])
-            test_partition_with_free_channels(self.model, partition=self.configs['partition'])
+            test_partition_with_free_channels(self.model, partition=self.configs['partition'], use_wandb=self.configs['use_wandb'], epoch=self.configs['admm_epochs']+3)
         else:
             pass
     

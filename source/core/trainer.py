@@ -11,6 +11,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
     batch_loss   = AverageMeter()
     batch_total_loss   = AverageMeter()
     batch_comm   = AverageMeter()
+    P_costs = []
     evalHelper   = EvalHelper(configs['data_code'])
     
     if comm:
@@ -105,7 +106,8 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         if ADMM is not None and configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0:
             #print('Updating assignment')
             update_time = time.time()
-            update_assignments(model, configs)
+            P_cost = update_assignments(model, configs, use_wandb=configs.get('use_wandb', False), batch_number=cepoch*len(data_loader) + batch_idx)
+            P_costs.append(P_cost)
             #print(f'Assignment ellapsed {time.time()-update_time} ms')
 
 
@@ -134,7 +136,8 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         'batch_total_loss': batch_total_loss,
         'batch_comm': batch_comm,
         'batch_acc':  batch_acc,
-        'admm_loss': admm_loss if ADMM is not None else None
+        'admm_loss': admm_loss if ADMM is not None else None,
+        'P_costs': P_costs
     }
     return metrics
 

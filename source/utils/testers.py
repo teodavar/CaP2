@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import wandb
 from numpy import linalg as LA
 import cv2
 
@@ -342,10 +343,8 @@ def test_partition(model, partition):
     
     print("===========================================================================\n\n")
     
-    
-import numpy as np
 
-def test_partition_with_free_channels(model, partition):
+def test_partition_with_free_channels(model, partition, use_wandb=False, epoch=0):
     """
     Tests partition sparsity while considering that if a machine is already computing a filter
     for an output channel with one input channel, then any additional input channels in that 
@@ -452,6 +451,19 @@ def test_partition_with_free_channels(model, partition):
         total_params, total_interp, total_interp_select, total_interpk, total_interpk_select))
     print("total_comms:{}, max-interp-comm:{}".format(total_comm_interp, total_max_comm_interp))
     print("===========================================================================\n\n")
+    
+    if use_wandb:
+        wandb.log({
+                f"params": kernels * kernel_size,
+                f"params_intrap": intra_weight * kernel_size,
+                f"params_interp": interpk_select * kernel_size,
+                f"interp_k": interpk,
+                f"interp_k_select": interpk_select,
+                f"max_interp_k_select": max(interps),
+                f"outsize": outsize,
+                f"total_interp_comm": sum(comms_interp),
+                f"max_interp_comm": max(comms_interp),
+        }, step=epoch)
 
     return total_comm_interp, total_max_comm_interp  # Can be used for further visualization or comparison
 

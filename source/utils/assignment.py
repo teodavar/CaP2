@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 import time
+import wandb
 from munkres import Munkres
 from scipy.optimize import linear_sum_assignment
 
@@ -41,38 +42,50 @@ def compute_cost_matrix(layer_name, layer_weights, partition):
 
     out_channels = w_np.shape[0]
     cost_mat = np.zeros((out_channels, num_parts))
+    
+    # Retrieve any 'outsize' scaling factor for this layer (default to 1 if not present)
+    outsize = layer_part.get('outsize', 1.0)
 
     # For each out_channel i, for each possible machine j
     for i in range(out_channels):
         for j in range(num_parts):
-            # Sum cost if input channels come from different partition k
+            cost_ij = 0.0
+            
+            # Sum cost contributions from each parent layer
             for parent_layer in parents:
                 if parent_layer not in partition:
                     raise ValueError(f"Parent layer {parent_layer} not found in partition dictionary.")
 
+                # Get parent partitioning
                 parent_filter_ids = partition[parent_layer]['filter_id']
-                    
-                # Compute communication cost based on parent filter assignments
-                num_active = 0
+
+                # For each input-partition k
                 for k in range(num_parts):
                     if k == j:
                         continue
+                    # The input channels belonging to machine k for this parent layer
                     input_ch_ids = np.asarray(parent_filter_ids[k], dtype=int)
 
+                    if input_ch_ids.size == 0:
+                        continue
+
+                    # Gather the weights from these input channels
                     if is_conv:
                         # shape: (out_c, in_c, kH, kW)
-                        active_w = w_np[i, input_ch_ids, :, :]
-                        all_zero_per_ch = np.all(active_w == 0, axis=(1, 2))
-                        num_active += np.sum(~all_zero_per_ch)
+                        w_sub = w_np[i, input_ch_ids, :, :]
                     else:
-                        # FC layer shape: (out_features, in_features)
-                        active_w = w_np[i, input_ch_ids]
-                        is_zero = (active_w == 0)
-                        num_active += np.sum(~is_zero)
+                        # shape: (out_features, in_features)
+                        w_sub = w_np[i, input_ch_ids]
 
-                # Apply communication cost based on num_active
-                if num_active > 0:
-                    cost_mat[i, j] += maps[j][k] * num_active
+                    # Sum the absolute values of these weights
+                    sum_abs = np.sum(np.abs(w_sub))
+
+                    # If there's any magnitude, add communication cost
+                    # scaled by the sum of those weights
+                    if sum_abs > 0:
+                        cost_ij += maps[k][j] * sum_abs * outsize
+                        
+            cost_mat[i, j] = cost_ij
     
     elapsed_time = time.time() - start_time
     #print(f"[Timing] compute_cost_matrix for {layer_name}: {elapsed_time:.4f}s")
@@ -195,17 +208,19 @@ def computeassignment_scipy(cost_matrix, budget=None):
     # Create an array that maps virtual machines back to original ones
     for machine_idx, cap in enumerate(machine_capacities):
         machine_mapping.extend([machine_idx] * cap)  # Repeat each machine based on capacity
-
+    
+    total_cost = 0
     for row, col in zip(row_ind, col_ind):
         if row < n_tasks:  # Ensure we're within real task indices
             real_machine = machine_mapping[col]
             cost_val = cost_matrix[row, real_machine]
+            total_cost += cost_val
             results.append((row, real_machine, cost_val))
 
     
     elapsed_time = time.time() - start_time
     #print(f"[Timing] computeassignment: {elapsed_time:.4f}s")
-    return results
+    return results, total_cost
 
 def list_to_partition(assignments, num_parts):
     """
@@ -218,7 +233,7 @@ def list_to_partition(assignments, num_parts):
 #  MAIN update_assignments
 ############################################################
 
-def update_assignments(model, configs):
+def update_assignments(model, configs, use_wandb=False, batch_number=None):
     """
     We:
       Do a topological pass and assign nodes
@@ -248,11 +263,12 @@ def update_assignments(model, configs):
                     w = model.state_dict()[layer_key]
                     cost_mat = compute_cost_matrix(layer_key, w, partition_dict)
                     assert len(configs['partition'][layer_key]['budget']) > 0, "Error: Budget list is empty!"
-                    sol = computeassignment_scipy(cost_mat, configs['partition'][layer_key]['budget'])
+                    sol, total_cost = computeassignment_scipy(cost_mat, configs['partition'][layer_key]['budget'])
                     sol.sort(key=lambda x: x[0])
                     assigns = [m for (ch, m, c) in sol]
                     newp = list_to_partition(assigns, partition_dict['num'])
                     partition_dict[layer_key]['filter_id'] = np.asarray(newp)
+    return total_cost
 
 ############################################################
 #  Example or Test
