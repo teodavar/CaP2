@@ -300,8 +300,8 @@ if __name__ == "__main__":
             # Set experiment ID
             experiment_flag = configs['experiment_name'] if 'experiment_name' in configs else "uniform"
             reassign_flag = f"rsgn{configs['reassign_freq']}" if configs['reassign'] else "fixed"
-            experiment_id = f"{configs['data_code']}_{configs['model']}_pr{pr_ratio}_np{configs['num_partition']}_{configs['sparsity_type']}_{experiment_flag}_{reassign_flag}"
-            
+            extra_tag = f"-{configs['extra_tag']}" if configs['extra_tag'] else "" 
+            experiment_id = f"{configs['data_code']}_{configs['model']}_pr{pr_ratio}_np{configs['num_partition']}_{configs['sparsity_type']}_{experiment_flag}_{reassign_flag}{extra_tag}"
             configs['experiment_dir'] = os.path.join(configs['log_dir'], experiment_id)
             
             if configs.get('use_wandb', False):

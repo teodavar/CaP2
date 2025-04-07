@@ -14,6 +14,9 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
     P_costs = []
     evalHelper   = EvalHelper(configs['data_code'])
     
+    if not model.training:
+        model.train()
+    
     if comm:
         partition = configs['partition']
     

@@ -503,7 +503,7 @@ def plot_layer(model, partition, layer_id=(1,), savepath=''):
 
                         for j in range(partition['num']):
                             if i==j: continue
-                            weight2d[partition[name]['filter_id'][i][:,None],partition[name]['channel_id'][j]] -= 1
+                            weight2d[partition[name]['filter_id'][i][:,None],parent_filter_ids[j]] -= 1
                 weight2d[weight2d==-1] = 0
                 
                 #red, green = '#FF716E', '#B4C06E'

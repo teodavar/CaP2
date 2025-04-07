@@ -1,10 +1,10 @@
 bn_partitions: [4, 4, 4, 4, 4, 4, 4, 4, 4]
-budgets: [[1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [
-    1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4,
-    1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [1, 4, 4, 1], [0, 4, 4, 0], [0,
-    4, 4, 0], [0, 4, 4, 0], [0, 4, 4, 0], [0, 4, 4, 0]]
-initial_budget: [1, 4, 4, 1]
-input_partition: [1, 2, 2, 1]
+budgets: [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [
+    1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1,
+    1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1,
+    1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1]]
+initial_budget: [1, 1, 1, 1]
+input_partition: [1, 1, 1, 1]
 layers: [inputs, conv1.weight, layer1.0.conv1.weight, layer1.0.conv2.weight, layer1.1.conv1.weight,
   layer1.1.conv2.weight, layer2.0.conv1.weight, layer2.0.conv2.weight, layer2.0.shortcut.0.weight,
   layer2.1.conv1.weight, layer2.1.conv2.weight, layer3.0.conv1.weight, layer3.0.conv2.weight,

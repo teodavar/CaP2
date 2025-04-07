@@ -201,6 +201,56 @@ def weight_pruning(weight, name, prune_ratio, sparsity_type, cross_x=4, cross_f=
     elif sparsity_type == "partition_row":
         num_partitions = partition['num']
         shape = weight.shape
+        weight3d = weight.reshape(shape[0], shape[1], -1)  # Reshape to (out_channels, in_channels, kernel_size_prod)
+
+        all_norms = []
+        all_indices = []  # To track which rows (output filters) correspond to which (src, dst) pairs
+
+        # First pass: Collect all L2 norms and their respective indices
+        for dst in range(num_partitions):  # Destination machines handling output filters
+            output_filters = partition[name]['filter_id'][dst]  # Output filters at this machine
+
+            for src in range(num_partitions):  # Source machines providing input channels
+                if src == dst:
+                    continue  # Skip intra-machine connections
+
+                # Gather input channels from all parents for the source machine
+                if len(parents) == 1:
+                    input_channels = partition[parents[0]]['filter_id'][src]
+                else:
+                    input_channels = np.concatenate([partition[parent]['filter_id'][src] for parent in parents])
+                    input_channels = np.unique(input_channels)  # Remove duplicates
+
+                if len(output_filters) == 0 or len(input_channels) == 0:
+                    continue  # Skip if no valid filters or inputs in this partition
+
+                # Extract the relevant submatrix of weights
+                submatrix = weight3d[np.ix_(output_filters, input_channels)]
+                row_l2_norm = LA.norm(submatrix.reshape(submatrix.shape[0], -1), axis=1)
+
+                # Store norms and corresponding indices for later pruning
+                for i, norm_val in enumerate(row_l2_norm):
+                    out_idx = output_filters[i]
+                    all_norms.append(norm_val)
+                    all_indices.append((dst, src, out_idx, input_channels))
+
+        if len(all_norms) == 0:
+            return  # Nothing to prune
+
+        # Compute the global pruning threshold
+        global_threshold = np.percentile(all_norms, percent)
+
+        # Second pass: Apply pruning based on the global threshold
+        for norm_val, (dst, src, out_idx, input_channels) in zip(all_norms, all_indices):
+            if norm_val < global_threshold:
+                # Zero out the weights for this (dst, src) machine-to-machine connection
+                weight3d[np.ix_([out_idx], input_channels)] = 0
+                
+        return num_partitions, torch.from_numpy(weight3d.reshape(shape)).to(device)
+    
+    elif sparsity_type == "partition_row_old":
+        num_partitions = partition['num']
+        shape = weight.shape
         weight3d = weight.reshape(shape[0], shape[1], -1)  # Preserve (out_channels, in_channels)
 
         for dst in range(num_partitions):  # Destination machines handling output filters

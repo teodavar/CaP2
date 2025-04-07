@@ -223,101 +223,7 @@ def generate_partition(configs, model):
     return configs
     
 
-def partition_generator(configs, model):
-    partition = {}
-    num_partition = {}
-    # print(configs['num_partition'])
-        
-    # # get # partition for each layer
-    # if isinstance(configs['num_partition'], int):
-    #     # Todo: automatically set bn_partition
-    #     ratio_partition, map_partition = {}, {}
-    #     bn_partition = [int(configs['num_partition'])] * 9
-    #     num = int(configs['num_partition'])
-    #     maps = np.ones((num,num))
-    #     for name, W in itertools.chain(model.named_parameters() , list({'inputs':None}.items())):
-    #         print(name)
-    #         try:
-    #             print(W.size())
-    #         except:
-    #             pass
-    #         if name=='inputs' or (len(W.size()) == 4) or (len(W.size()) == 2):
-    #             if not 'out' in name:                  
-    #                 num_partition[name] = num
-    #                 ratio_partition[name] = [1]*num
-    #                 np.fill_diagonal(maps, 0)
-    #                 map_partition[name] = maps.astype(int).tolist()
-                
-    # elif os.path.exists(configs['num_partition']):
-    with open(configs['partition_path'], "r") as stream:
-        raw_dict = yaml.safe_load(stream)
-        
-        bn_partition = raw_dict['bn_partitions']
-        ratio_partition = raw_dict['partitions']
-        map_partition = raw_dict['maps']
-        
-        # print(ratio_partition,map_partition)
-        for name, key in ratio_partition.items():
-            # print('name:', name)
-            # print('key:', key)
-            # print(name, key)
-            # ratio_partition[name] = key[0]
-            ratio_partition[name] = key
-            # num_partition[name] = len(key[0])
-            num_partition[name] = len(key)
-
-    # else:
-    #     raise Exception("num_partition must be either a filepath or an integer")
-    
-    print('num_partition:', num_partition)
-    print('ratio_partition:', ratio_partition)
-    print('map_partition:', map_partition)
-    print('bn_partition:', bn_partition)
-    
-    # setup bn_partition
-    partition['bn_partition'] = bn_partition
-    
-    # setup prune ratio
-    pr, configs['prune_ratio'] = configs['prune_ratio'], {}
-    for name, num in num_partition.items():
-        ratio = ratio_partition[name]
-        # configs['prune_ratio'][name] = 1 - sum(r**2 for r in ratio) / sum(ratio)**2
-        configs['prune_ratio'][name] = pr
-        
-    # setup partition
-    ratio_prev = ratio_partition['inputs'] # for current channel ratio, which is equal to the previous filter ratio
-    
-    for name, W in model.named_parameters():
-        if name in num_partition and num_partition[name] > 1:
-            num, maps = num_partition[name], map_partition[name]
-            
-            # setup selected kernel ids
-            filter_id  = get_partition_from_code(configs['data_code'], W.shape[0], ratio_partition[name])
-            channel_id = get_partition_from_code(configs['data_code'], W.shape[1], ratio_prev)
-            ratio_prev = ratio_partition[name]
-            partition[name] = {'num': num, 
-                               'filter_id': filter_id,
-                               'channel_id': channel_id,
-                               'maps': maps}
-            
-    # print('partition:', partition)
-            
-            # v0: split by 'jump'
-            #own_state[name].copy_(param_s[i::num_partition])
-            # v1: split by equal 'cut'
-            #len_in, len_out = int(weight.shape[0]/num_partition), int(weight.shape[1]/num_partition)
-            #cost_mask[i*len_in:(i+1)*len_in,i*len_out:(i+1)*len_out,:,:] = 0
-            # v2: split by app-equal 'cut'
-            #k1, m1 = divmod(weight.shape[0], num)
-            #k2, m2 = divmod(weight.shape[1], num)
-            #for i in range(num):
-            #    filter_id.append(np.array(range(ParCalculator(i,k1,m1),ParCalculator(i+1,k1,m1))))
-            #    channel_id.append(np.array(range(ParCalculator(i,k2,m2),ParCalculator(i+1,k2,m2))))
-            
-    configs['partition'] = partition    
-    return configs
-
-def get_partition_from_code(dataset, shape, num_partitions, budget):
+def get_partition_from_code(dataset, shape, num_partitions, budget, random_assign=False):
     """
     Distributes `shape` filters across `num_partitions` based on the given `budget`.
 
@@ -328,59 +234,51 @@ def get_partition_from_code(dataset, shape, num_partitions, budget):
         budget (list of float): A list of size `num_partitions` where each entry represents 
                                 the proportion of filters assigned to that partition.
                                 Must sum to 1.
+        random_assign (bool): If True, the filters are randomly assigned 
+                              to each partition (with partitions then sorted ascendingly).
+                              Default is False (original deterministic assignment).
 
     Returns:
         list of np.ndarray: A list where each entry is a NumPy array containing 
-                            the indices of the filters assigned to that partition.
+                            the indices of the filters assigned to that partition. 
+                            The indices within each partition are sorted in ascending order.
     """
     if not np.isclose(sum(budget), 1.0):
         raise ValueError(f"Budget proportions must sum to 1, but got {sum(budget):.6f}.")
 
-    p_range = np.array(range(shape))  # Index range of filters
-    p_id = []
-    
-    # Compute absolute filter allocation per partition with rounding
+    # Generate a range of filter indices
+    p_range = np.arange(shape)
+
+    # If random assignment is enabled, shuffle once before splitting
+    if random_assign:
+        np.random.shuffle(p_range)
+
+    # Compute the absolute filter allocation per partition with rounding
     absolute_counts = np.round(np.array(budget) * shape).astype(int)
 
-    # Ensure total allocation sums to `shape` (adjust rounding issues)
+    # Adjust for any rounding mismatches
     while absolute_counts.sum() < shape:
-        absolute_counts[np.argmax(budget)] += 1  # Add remaining filters to the largest budget
+        absolute_counts[np.argmax(budget)] += 1
     while absolute_counts.sum() > shape:
-        absolute_counts[np.argmin(budget)] -= 1  # Remove excess filters from the smallest budget
+        absolute_counts[np.argmin(budget)] -= 1
 
-    # Assign filters to partitions
+    # Assign filters to each partition
+    p_id = []
     start = 0
     for count in absolute_counts:
-        p_id.append(np.array(p_range[start:start + count], dtype=int))
+        subset = p_range[start : start + count]
+        # Sort each subset in ascending order to keep partition indices sorted
+        subset_sorted = np.sort(subset)
+        p_id.append(subset_sorted)
         start += count
 
-    # Final check to ensure all filters are assigned correctly
+    # Final sanity check: ensure all filters are assigned
     assigned_channels = sum(len(part) for part in p_id)
     if assigned_channels != shape:
         raise ValueError(f"Partitioning failed: {assigned_channels} filters assigned, but expected {shape}.")
 
     return p_id
-
-def get_partition_from_code_legacy(dataset, shape, ratio):
-    p_id = []
-    #if dataset == 'flash':
-    #    p_len = [64, 256, 512]
-    #    p_ratio = np.cumsum([0.0]+[x/sum(p_len) for x in p_len])
-    #else:
-    #    p_ratio = np.cumsum([0.0]+[1/num for _ in range(num)])
-    p_ratio = np.cumsum([0.0]+[x/sum(ratio) for x in ratio])
-        
-    p_range = np.array(range(shape))
-    for i in range(len(ratio)):
-        p_id.append(p_range[int(p_ratio[i]*shape):int(p_ratio[i+1]*shape)])   
-    
-    # Check if there are remaining elements and add them to the last list
-    last_index = int(p_ratio[-1] * shape)
-    if last_index < shape:
-        p_id[-1] = np.concatenate((p_id[-1], p_range[last_index:]))
-    
-    return p_id
-                              
+             
 def ParCalculator(i,k,m):
     return i*k+min(i, m)
 
@@ -426,7 +324,7 @@ def set_communication_cost(model, partition):
 
                         # Use parent's filter_id instead of channel_id
                         if len(parent_filter_ids[j]) > 0:
-                            cost_mask[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]] = maps
+                            cost_mask[partition[name]['filter_id'][i][:, None], parent_filter_ids[j]] += maps
 
             comm_costs[name] = torch.from_numpy(cost_mask).to(device)
 
@@ -464,6 +362,10 @@ def compute_comm_cost(model, partition):
             
             if not parents:  # If no parents, skip communication cost computation
                 continue
+            
+            for parent_layer in parents:
+                if parent_layer not in partition:
+                    raise ValueError(f"Parent layer {parent_layer} not found in partition dictionary.")
 
             # Compute the absolute sum across kernel dimensions
             if is_conv:
@@ -474,20 +376,19 @@ def compute_comm_cost(model, partition):
             # Iterate through all partitions and compute communication cost
             for n in range(num_machines):  # Output filter partitions
                 for C_out in layer_partition['filter_id'][n]:  # Output filters in this partition
-                    for parent_layer in parents:
-                        if parent_layer not in partition:
-                            raise ValueError(f"Parent layer {parent_layer} not found in partition dictionary.")
-                        parent_filters = partition[parent_layer]['filter_id']
+                    for i in range(num_machines):  # Input partitions
+                        if i == n:
+                            continue  # Skip if input and output are on the same machine
+                            
+                        if len(parents) == 1:
+                            input_channels = partition[parents[0]]['filter_id'][i]
+                        else:
+                            input_channels = np.concatenate([partition[parent]['filter_id'][i] for parent in parents])
+                            input_channels = np.unique(input_channels)  # Remove duplicates
 
-                        for i in range(num_machines):  # Input partitions
-                            if i == n:
-                                continue  # Skip if input and output are on the same machine
-
-                            input_channels = parent_filters[i]
-
-                            # Check if weights between this output filter and input channels are nonzero
-                            if np.any(W_flat[C_out, input_channels]):
-                                total_comm_cost += comm_cost_map[n][i] * outsize
+                        # Check if weights between this output filter and input channels are nonzero
+                        if np.any(W_flat[C_out, input_channels]):
+                            total_comm_cost += comm_cost_map[i][n] * outsize
 
     return total_comm_cost
 
@@ -495,6 +396,11 @@ def featuremap_summary(model, partition, inputs):
     '''
     Calculate the size of output (feature map) of each layer
     '''
+    # Save the current mode
+    was_training = model.training
+    
+    model.eval()
+    
     def register_hook(name):
         def hook(module, input, output):
             outshape = list(output.size())
@@ -521,6 +427,9 @@ def featuremap_summary(model, partition, inputs):
         if name in partition and 'outsize' not in partition[name]: 
             partition[name]['outsize'] = 1
         if name in partition: print(name, partition[name]['outsize'])
+        
+    if was_training:
+        model.train()
             
     return partition
 

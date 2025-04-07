@@ -4,6 +4,7 @@ from ..utils.io import *
 from ..utils.eval import *
 from ..utils.misc import *
 from ..utils.masks import *
+from ..utils.assignment import *
 from ..utils.calculate_flops.calflops import calflops
 from .admm import *
 
@@ -14,6 +15,8 @@ from torchsummary import summary
 from torchviz import make_dot
 import torch.onnx
 import traceback
+import numpy as np
+import random
 
 class MoP:
     """
@@ -22,6 +25,10 @@ class MoP:
     def __init__(self, configs, print_model=True, print_params=True):
         
         torch.manual_seed(configs['seed'])
+        np.random.seed(configs['seed'])
+        random.seed(configs['seed'])
+        torch.cuda.manual_seed(configs['seed'])
+        torch.cuda.manual_seed_all(configs['seed'])
         self.configs = configs
         self.model_file = configs['load_pruned_model_file']
         
@@ -102,7 +109,7 @@ class MoP:
         start_time = time.time()
         
         if not self.configs['plot']:
-            nepoch = self.configs['admm_epochs']
+            nepoch = self.configs['admm_epochs'] if self.configs['prune_ratio'] != 0 else 0
             criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
                                                 self.configs['optimizer'], self.configs['learning_rate'], nepoch)
             
@@ -188,8 +195,12 @@ class MoP:
                 raise  # Re-raise the error after printing for visibility
             
             # hard prune
-            hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
+            if self.configs['prune_ratio'] != 0:
+                hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
             self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
+            if self.configs['prune_ratio'] == 0 and self.configs['reassign']:
+                P_cost = update_assignments(self.model, self.configs, use_wandb=False)
+                    
             save_partition(self.configs, cepoch, os.path.join(experiment_dir, "partition_final"))  # Save last partition state
             if self.configs.get('use_wandb', False):
                 artifact = wandb.Artifact(name="final_partition", type="config")
@@ -199,10 +210,11 @@ class MoP:
             # test sparsity
             test_kernel_sparsity(self.model, partition=self.configs['partition'])
             test_partition_with_free_channels(self.model, partition=self.configs['partition'], use_wandb=self.configs['use_wandb'], epoch=nepoch+2)
-            logger.save()
-            logger.plot()
-            print("Progress saved. Exiting gracefully.")
-        
+            if self.configs['prune_ratio'] != 0:
+                logger.save()
+                logger.plot()
+                print("Progress saved. Exiting gracefully.")
+
         else:
             self.model = get_model_from_code(self.configs).to(self.configs['device'])
             state_dict = torch.load(get_model_path_split("{}".format(self.configs["load_pruned_model_file"])), map_location=self.configs['device'])
@@ -249,7 +261,7 @@ class MoP:
             masks = get_model_mask(model=self.model)
         
             # masked retrain
-            nepoch = self.configs['retrain_ep']
+            nepoch = self.configs['retrain_ep'] if self.configs['prune_ratio'] != 0 else 0
             criterion, optimizer, scheduler = set_optimizer(self.configs, self.model, self.train_loader, \
                                                 self.configs['retrain_opt'], self.configs['retrain_lr'], nepoch)
         

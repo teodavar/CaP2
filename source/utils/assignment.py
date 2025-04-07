@@ -11,7 +11,7 @@ from scipy.optimize import linear_sum_assignment
 #  Cost & Assignment Helpers
 ############################################################
 
-def compute_cost_matrix(layer_name, layer_weights, partition):
+def compute_cost_matrix(layer_name, layer_weights, partition, use_comm_cost=False):
     """
     Computes the cost of processing an output neuron/channel at each partition.
 
@@ -76,14 +76,18 @@ def compute_cost_matrix(layer_name, layer_weights, partition):
                     else:
                         # shape: (out_features, in_features)
                         w_sub = w_np[i, input_ch_ids]
+                    if not use_comm_cost:
+                        # Sum the absolute values of these weights
+                        sum_abs = np.sum(np.abs(w_sub))
 
-                    # Sum the absolute values of these weights
-                    sum_abs = np.sum(np.abs(w_sub))
-
-                    # If there's any magnitude, add communication cost
-                    # scaled by the sum of those weights
-                    if sum_abs > 0:
-                        cost_ij += maps[k][j] * sum_abs * outsize
+                        # If there's any magnitude, add communication cost
+                        # scaled by the sum of those weights
+                        if sum_abs > 0:
+                            cost_ij += maps[k][j] * sum_abs * outsize
+                    else:
+                        shape = w_sub.shape
+                        if np.any(w_sub.reshape(shape[0], shape[1], -1)):
+                            cost_ij += maps[k][j] * outsize
                         
             cost_mat[i, j] = cost_ij
     
