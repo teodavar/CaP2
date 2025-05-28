@@ -2,10 +2,8 @@ import time
 from tqdm import tqdm
 from ..utils.misc import *
 from ..utils.eval import *
-from ..utils.relaxed_utils import *
 from ..utils.assignment import *
 from .admm import *
-import sys
 
 def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, scheduler, ADMM=None, masks=None, comm=False, old_comm_loss=False):
 
@@ -23,17 +21,14 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         partition = configs['partition']
     
     if ADMM is not None: 
-        ADMM.Z_update(configs, model)
-
-    
-    
-    
-    
+        admm_initialization(configs, ADMM=ADMM, model=model)
+        
     start_time = time.time()
     n_data = configs['batch_size'] * len(data_loader)
     pbar = tqdm(enumerate(data_loader), total=n_data/configs['batch_size'], ncols=150)
+    
     for batch_idx, batch in pbar:
-        
+           
         data   = ()
         for piece in batch[:-1]:
             data += (piece.float().to(configs['device']),)
@@ -65,17 +60,30 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         # print('total_loss:', total_loss)
         
         if ADMM is not None:
-            admm_loss= ADMM.compute_admm_loss(model)  
-            total_loss+=admm_loss
+            z_u_update(configs, ADMM, model, cepoch, batch_idx)  # update Z and U variables
+            prev_loss, admm_loss, total_loss = append_admm_loss(ADMM, model, total_loss)  # append admm losses
             
         if comm:
             #v1: abs(W)*comm_cost
             if not configs['reassign'] or old_comm_loss: 
-                comm_loss=ADMM.comunication_penalty()
+                for (name, W) in model.named_parameters():
+                    if name in ADMM.prune_ratios:
+                            comm_cost = torch.abs(W) * configs['comm_costs'][name]
+                            comm_cost = comm_cost.view(comm_cost.size(0), -1).sum()
+                            if configs['comm_outsize']:
+                                comm_loss += comm_cost*partition[name]['outsize']
+                            else:
+                                comm_loss += comm_cost
             #v3: take into account inference split
             else: 
-                #alternative communication penalty !!!!!!!!!!!!!!
-                print("not yet")
+                comm_loss = compute_comm_cost(model, configs['partition'])
+                comm_loss = torch.tensor(comm_loss)
+                    
+                '''
+                computation cost:
+                for i in range(partition[name]['num']):
+                    comp_loss = max(comp_loss, torch.abs(W).view(W.size(0), -1)[partition[name]['filter_id'][i],:].sum())
+                '''
                     
             total_loss += configs['lambda_comm'] * comm_loss + configs['lambda_comp'] * comp_loss
             # print('total_loss:', total_loss)
@@ -96,15 +104,14 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             admm_adjust_learning_rate(optimizer, cepoch, configs)
         else:
             scheduler.step()
-        
-        if ADMM is not None:
-            admm_epochs, sparsity_type = configs['admm_epochs'], configs['sparsity_type']
-            if (cepoch != 1 and (cepoch - 1) % admm_epochs == 0 and batch_idx == 0) or True: #TT
-                ADMM.Z_update(configs, model)
-                ADMM.U_update(configs, model)
-        if ADMM is not None and ((configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0) or True): #TT
-            ADMM.update_assignment()
-
+            
+        # Reassign neurons to machines
+        if ADMM is not None and configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0:
+            #print('Updating assignment')
+            update_time = time.time()
+            P_cost = update_assignments(model, configs, use_wandb=configs.get('use_wandb', False), batch_number=cepoch*len(data_loader) + batch_idx)
+            P_costs.append(P_cost)
+            #print(f'Assignment ellapsed {time.time()-update_time} ms')
 
 
         acc1 = evalHelper.call(output, target)

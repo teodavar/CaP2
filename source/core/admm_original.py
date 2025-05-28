@@ -11,89 +11,24 @@ import yaml
 import random
 from itertools import combinations
 import collections
-import sys
-import copy
-from ..utils.relaxed_utils import *
+
 from ..utils.testers import *
 
-def translate_to_tensor(L):
-    num=len(L)
-    lsize=0
-    for a in L:
-        lsize+=len(a)
-    tensor=torch.zeros((lsize,num)).float()
-    for m in range(num):
-        for n in L[m]:
-            tensor[n,m]=1
-    return tensor.to(device='cuda')
+
 
 class ADMM:
-    def __init__(self, config_dict, model, rho=0.001, target='weight',approach="original"):
-        self.approach=approach
-        self.config=config_dict
-        self.model=model
+    def __init__(self, config_dict, model, rho=0.001, target='weight'):
         self.ADMM_U = {}
         self.ADMM_Z = {}
         self.rho = rho
         self.target = target
-        self.ADMM_V = None 
-        self.ADMM_Y = None 
+        
         self.rhos = {}
         self.prune_ratio = config_dict['prune_ratio']
         self.device = config_dict['device']
         self.par_first_layer = config_dict['par_first_layer']
         self.partition = config_dict['partition']
         self.init(model)
-
-        ######
-        self.P={}
-        self.layer_info={}
-        self.bn_partition=self.partition['bn_partition']
-        self.num=self.partition['num']
-        self.C=torch.FloatTensor(self.partition['maps']).to(self.device)
-        self.input_partition=self.partition['input_partition']
-        self.initial_budget=self.partition['initial_budget']
-        self.layer_names=self.partition['layers']
-        self.model_graph=self.partition['model_graph']
-        for l in self.layer_names:
-            lsize=0
-            for a in self.partition[l]['filter_id']:
-                lsize+=len(a)
-            self.layer_info[l]= {k: v for k, v in self.partition[l].items() if k != "filter_id"} 
-            self.layer_info[l]["layer_size"]=lsize
-        self.P=self.init_assignment(False)
-        self.Y=self.init_assignment(True)
-        self.V=self.zero_assignment()
-        self.Z_old={}
-        self.Y_old={}
-        self.layers=[]
-        self.W={}
-        for (name, W) in model.named_parameters():  ## initialize Z (for both weights and bias)
-            if name in self.prune_ratios:
-                self.layers.append(name)
-                self.W[name]=W
-
-
-
-
-
-    def init_assignment(self,hard=False):
-        P={}
-        for l in self.layer_names:
-            if hard==False:
-                if l!="inputs":
-                    P[l]=torch.full((self.layer_info[l]["layer_size"],self.num), 1/self.num).to(device='cuda')
-                else:
-                    P[l]=translate_to_tensor(self.partition[l]['filter_id'])
-            else:
-                P[l]=translate_to_tensor(self.partition[l]['filter_id'])
-        return P
-
-    def zero_assignment(self):
-        P={}
-        for l in self.layer_names:
-            P[l]=P[l]=torch.zeros((self.layer_info[l]["layer_size"],self.num)).to(device='cuda')
-        return P
 
     def init(self, model):
         """
@@ -124,171 +59,6 @@ class ADMM:
             self.ADMM_U[name] = torch.zeros(W.shape).to(self.device)  # add U
             self.ADMM_Z[name] = torch.Tensor(W.shape).to(self.device)  # add Z
 
-    def compute_admm_loss(self, model):
-        admm_loss = {}
-        for i, (name, W) in enumerate(model.named_parameters()):  ## initialize Z (for both weights and bias)
-            if name not in self.prune_ratios:
-                continue
-
-            admm_loss[name] = 0.5 * self.rhos[name] * (torch.norm(W - self.ADMM_Z[name] + self.ADMM_U[name], p=2)**2)
-            #print(name, admm_loss[name], ADMM.rhos[name])
-            #print(name, torch.norm(W - ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2)**2)
-            # admm_loss[name] = 0.5 * ADMM.rhos[name] * (torch.norm(ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2) ** 2)  # test if Z,U are net detached
-
-
-        total_admm_loss = 0
-        for k, v in admm_loss.items():
-            total_admm_loss += v
-        #print('admm_loss: ', mixed_loss)
-        return total_admm_loss
-
-
-    def Z_update(self,config_dict,
-               model,
-               writer=False,
-               cross_x=4,
-               cross_f=1):
-        print("Z update")
-        admm_epochs, sparsity_type = config_dict['admm_epochs'], config_dict['sparsity_type']
-        
-        for i, (name, W) in enumerate(model.named_parameters()):
-            if name not in self.prune_ratios:
-                continue          
-            if config_dict['multi_rho']:
-                admm_multi_rho_scheduler(self,name) # call multi rho scheduler every admm update
-            
-            self.ADMM_Z[name] = W.detach() + self.ADMM_U[name].detach()  # Z(k+1) = W(k+1)+U[k]
-
-            self.WP(name, sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
-            
-            self.ADMM_U[name] = W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
-    
-    
-    def U_update(self,config_dict,
-               model,
-               writer=False,
-               cross_x=4,
-               cross_f=1):
-        print("U update")
-        admm_epochs, sparsity_type = config_dict['admm_epochs'], config_dict['sparsity_type']
- 
-        for i, (name, W) in enumerate(model.named_parameters()):
-            if name not in self.prune_ratios:
-                continue
-            self.ADMM_U[name] = W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
-
-    def WP(self,name, sparsity_type, cross_x=4, cross_f=1):
-        prune_ratio=self.prune_ratios[name]
-        partition=self.partition
-        weight = self.ADMM_Z[name].detach()
-        device = weight.device
-        percent = prune_ratio * 100
-        if len(weight.shape)==2:
-            W= weight
-        else:
-            W= torch.norm(weight, dim=(2, 3))
-        parents = partition[name].get('parents', [])
-        P=self.Y[parents[0]]
-        
-        for parent in parents: 
-            if parent not in partition:
-                raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
-        for i in range(1,len(parents)):
-            P+=self.Y[parents[i]]
-        P[P!=0]=1
-        
-        if (sparsity_type == "irregular") and False:
-            weight = weight.cpu().detach().numpy()
-            weight_temp = np.abs(
-                weight)  # a buffer that holds weights with absolute values
-            percentile = np.percentile(weight_temp,
-                                    percent)  # get a value for this percentitle
-            under_threshold = weight_temp < percentile
-            above_threshold = weight_temp > percentile
-            above_threshold = above_threshold.astype(
-                np.float32
-            )  # has to convert bool to float32 for numpy-tensor conversion
-            weight[under_threshold] = 0
-            return torch.from_numpy(above_threshold).to(device), torch.from_numpy(weight).to(device)
-        elif sparsity_type == "partition_row" or True:
-            E=W**2
-            needs=torch.sqrt(E@P)
-            #W[W!=0]=1
-            needs=W@P
-            Pout=self.Y[name]
-            c2=Pout*(1e+10)
-            res1=needs+c2
-            t=torch.quantile(res1, prune_ratio) 
-            res1[res1<t]=0
-            res1[res1!=0]=1
-            mask=res1@torch.transpose(P,0,1)
-            mask[mask!=0]=1
-            if len(weight.shape)==2:
-                weight=mask*weight
-            else:
-                mask=mask.unsqueeze(2)
-                mask=mask.unsqueeze(3)
-                mask=mask.repeat((1,1,weight.shape[2],weight.shape[3]))
-                weight=mask*weight
-            return weight
-    
-    def comunication_penalty(self,hard=False):
-        if self.approach=="original":
-            comm=comunication_penalty(self.model,self,self.config,self.P)
-        if self.approach=="relaxed":
-            if hard==False:
-                comm=comunication_penalty(self.model,self,self.config,self.P)
-            else:
-                comm=comunication_penalty(self.model,self,self.config,self.Y)
-        return comm    
-
-    def update_assignment(self):
-        P_costs=[]
-        if self.approach=="original":
-            print("timing P")
-            start=time.time()
-            solve_original_assignment(self) 
-            print(time.time()-start)
-            P_costs.append(self.comunication_penalty())
-        elif self.approach=="relaxed":
-            print("timing P")
-            start=time.time()
-            solve_relaxed_assignment(self.model,self,self.config) 
-            print(time.time()-start)
-            start=time.time()
-            print("timing Y")
-            Y_update(self.model,self,self.config) 
-            print(time.time()-start)
-            start=time.time()
-            print("timing V")
-            V_update(self.model,self,self.config) 
-            print(time.time()-start)
-            start=time.time()
-            P_costs.append(self.comunication_penalty(hard=True))
-        return P_costs
-
-    def linear_cost_matrix(self,name):
-        if self.approach=="original":
-            Ps=self.P
-        parents = self.partition[name].get('parents', [])
-
-        E=torch.norm(self.W[name], dim=(2, 3))
-        
-        if len(parents)==0:
-            raise ValueError(f"no parents")
-        P=Ps[parents[0]]
-        for i in range(1,len(parents)):
-            P+=Ps[parents[i]]
-        #print(E.device,P.device,self.C.device)
-        Cl=E @ P @ self.C
-
-        #print(E.shape,P.shape,self.C.shape,Cl.shape)
-        return Cl
-        #if cost type is 2
-        
-               
-#########################################################################
-#########################################################################
 
 def random_pruning(weight, prune_ratio, sparsity_type):
     weight = weight.cpu().detach().numpy()  # convert cpu tensor to numpy
@@ -435,7 +205,7 @@ def weight_pruning(weight, name, prune_ratio, sparsity_type, cross_x=4, cross_f=
         shape = weight.shape
         weight3d = weight.reshape(shape[0], shape[1], -1)  # Reshape to (out_channels, in_channels, kernel_size_prod)
 
-        all_norms = []   
+        all_norms = []
         all_indices = []  # To track which rows (output filters) correspond to which (src, dst) pairs
 
         # First pass: Collect all L2 norms and their respective indices
@@ -629,7 +399,40 @@ def z_u_update(config_dict,
             ADMM.ADMM_U[name] = W.detach() - ADMM.ADMM_Z[name].detach() + ADMM.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
 
 
+def append_admm_loss(ADMM, model, ce_loss):
+    '''
+    append admm loss to cross_entropy loss
+    Args:
+        args: configuration parameters
+        model: instance to the model class
+        ce_loss: the cross entropy loss
+    Returns:
+        ce_loss(tensor scalar): original cross enropy loss
+        admm_loss(dict, name->tensor scalar): a dictionary to show loss for each layer
+        ret_loss(scalar): the mixed overall loss
 
+    '''
+    admm_loss = {}
+
+    
+
+    for i, (name, W) in enumerate(model.named_parameters()):  ## initialize Z (for both weights and bias)
+        if name not in ADMM.prune_ratios:
+            continue
+
+        admm_loss[name] = 0.5 * ADMM.rhos[name] * (torch.norm(W - ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2)**2)
+        #print(name, admm_loss[name], ADMM.rhos[name])
+        #print(name, torch.norm(W - ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2)**2)
+        # admm_loss[name] = 0.5 * ADMM.rhos[name] * (torch.norm(ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2) ** 2)  # test if Z,U are net detached
+    
+    mixed_loss = 0
+    mixed_loss += ce_loss
+    total_admm_loss = 0
+    for k, v in admm_loss.items():
+        mixed_loss += v
+        total_admm_loss += v
+    #print('admm_loss: ', mixed_loss)
+    return ce_loss, total_admm_loss, mixed_loss
 
 
 def admm_multi_rho_scheduler(ADMM, name):
@@ -711,19 +514,3 @@ def compute_partition_convergence(prev_P, partition):
     return convergence_P
 
 
-def compute_admm_loss(ADMM, model):
-    admm_loss = {}
-    for i, (name, W) in enumerate(model.named_parameters()):  ## initialize Z (for both weights and bias)
-        if name not in ADMM.prune_ratios:
-            continue
-
-        admm_loss[name] = 0.5 * ADMM.rhos[name] * (torch.norm(W - ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2)**2)
-        #print(name, admm_loss[name], ADMM.rhos[name])
-        #print(name, torch.norm(W - ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2)**2)
-        # admm_loss[name] = 0.5 * ADMM.rhos[name] * (torch.norm(ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2) ** 2)  # test if Z,U are net detached
-
-    total_admm_loss = 0
-    for k, v in admm_loss.items():
-        total_admm_loss += v
-    #print('admm_loss: ', mixed_loss)
-    return total_admm_loss
