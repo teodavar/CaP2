@@ -36,8 +36,6 @@ class ADMM:
         self.ADMM_Z = {}
         self.rho = rho
         self.target = target
-        self.ADMM_V = None 
-        self.ADMM_Y = None 
         self.rhos = {}
         self.prune_ratio = config_dict['prune_ratio']
         self.device = config_dict['device']
@@ -64,18 +62,37 @@ class ADMM:
         self.P=self.init_assignment(False)
         self.Y=self.init_assignment(True)
         self.V=self.zero_assignment()
-        self.Z_old={}
-        self.Y_old={}
         self.layers=[]
         self.W={}
         for (name, W) in model.named_parameters():  ## initialize Z (for both weights and bias)
             if name in self.prune_ratios:
                 self.layers.append(name)
                 self.W[name]=W
+        self.init_convergence()
 
 
 
-
+    def return_assignment(self,hard=True):
+        if self.approach=="original":
+            return self.P
+        elif self.approach=="relaxed":
+            return self.Y if hard else self.P
+    def init_convergence(self):
+        self.prev_W=copy.deepcopy(self.W)
+        self.prev_Z=copy.deepcopy(self.ADMM_Z)
+        self.prev_Y=copy.deepcopy(self.Y)
+        self.prev_P=copy.deepcopy(self.P)
+    def convergence(self):
+        convergence_W = sum(torch.norm(self.W[name] - self.prev_W[name]) for name in self.layers)
+        convergence_Z = sum(torch.norm(self.ADMM_Z[name] - self.prev_Z[name]) for name in self.layers)
+        convergence_P = sum(torch.norm(self.P[name] - self.prev_P[name]) for name in self.layers)
+        convergence_Y = sum(torch.norm(self.Y[name] - self.prev_Y[name]) for name in self.layers)
+        self.prev_W=copy.deepcopy(self.W)
+        self.prev_Z=copy.deepcopy(self.ADMM_Z)
+        self.prev_Y=copy.deepcopy(self.Y)
+        self.prev_P=copy.deepcopy(self.P)
+        #print(convergence_W,convergence_Z,convergence_P)
+        return convergence_W,convergence_Z,convergence_P,convergence_Y
 
     def init_assignment(self,hard=False):
         P={}
@@ -148,7 +165,7 @@ class ADMM:
                writer=False,
                cross_x=4,
                cross_f=1):
-        print("Z update")
+        #print("Z update")
         admm_epochs, sparsity_type = config_dict['admm_epochs'], config_dict['sparsity_type']
         
         for i, (name, W) in enumerate(model.named_parameters()):
@@ -169,7 +186,7 @@ class ADMM:
                writer=False,
                cross_x=4,
                cross_f=1):
-        print("U update")
+        #print("U update")
         admm_epochs, sparsity_type = config_dict['admm_epochs'], config_dict['sparsity_type']
  
         for i, (name, W) in enumerate(model.named_parameters()):
@@ -245,24 +262,24 @@ class ADMM:
     def update_assignment(self):
         P_costs=[]
         if self.approach=="original":
-            print("timing P")
+            #print("timing P")
             start=time.time()
             solve_original_assignment(self) 
-            print(time.time()-start)
+            #print(time.time()-start)
             P_costs.append(self.comunication_penalty())
         elif self.approach=="relaxed":
-            print("timing P")
+            #print("timing P")
             start=time.time()
             solve_relaxed_assignment(self.model,self,self.config) 
-            print(time.time()-start)
+            #print(time.time()-start)
             start=time.time()
-            print("timing Y")
+            #print("timing Y")
             Y_update(self.model,self,self.config) 
-            print(time.time()-start)
+            #print(time.time()-start)
             start=time.time()
-            print("timing V")
+            #print("timing V")
             V_update(self.model,self,self.config) 
-            print(time.time()-start)
+            #print(time.time()-start)
             start=time.time()
             P_costs.append(self.comunication_penalty(hard=True))
         return P_costs

@@ -472,7 +472,7 @@ Partition information of layer4.1.conv2.weight:
        501, 502, 503, 504, 505, 506, 507, 508, 509, 510, 511])], 'parents': ['layer4.1.conv1.weight'], 'budget': array([0.25, 0.25, 0.25, 0.25])}
 Partition information of inputs:
  {'filter_id': [array([], dtype=int64), array([0]), array([1]), array([2])], 'input_partition': [0.25, 0.25, 0.25, 0.25]}
-Inference time per data is 1.363516ms.
+Inference time per data is 1.380682ms.
 conv1.weight 1024
 layer1.0.conv1.weight 1024
 layer1.0.conv2.weight 1024
@@ -545,4 +545,308 @@ total_comms:0, max-interp-comm:0
 {'conv1.weight': 0.5, 'layer1.0.conv1.weight': 0.5, 'layer1.0.conv2.weight': 0.5, 'layer1.1.conv1.weight': 0.5, 'layer1.1.conv2.weight': 0.5, 'layer2.0.conv1.weight': 0.5, 'layer2.0.conv2.weight': 0.5, 'layer2.0.shortcut.0.weight': 0.5, 'layer2.1.conv1.weight': 0.5, 'layer2.1.conv2.weight': 0.5, 'layer3.0.conv1.weight': 0.5, 'layer3.0.conv2.weight': 0.5, 'layer3.0.shortcut.0.weight': 0.5, 'layer3.1.conv1.weight': 0.5, 'layer3.1.conv2.weight': 0.5, 'layer4.0.conv1.weight': 0.5, 'layer4.0.conv2.weight': 0.5, 'layer4.0.shortcut.0.weight': 0.5, 'layer4.1.conv1.weight': 0.5, 'layer4.1.conv2.weight': 0.5}
 Epoch-[000]: Test loss: 2.30, acc: 12.91.
 
-Unexpected error encountered: 'convergence_Y'
+📌 **Epoch 0 Summary**:
+    ➤ Global Loss: N/A
+    ➤ Train Accuracy: N/A
+    ➤ ML Loss: N/A
+    ➤ Comm Loss: N/A
+    ➤ P Average Cost: N/A
+    ➤ ADMM Loss: N/A
+    ➤ Agreement Quality: N/A
+    ➤ Convergence W: N/A
+    ➤ Convergence Z: N/A
+    ➤ Convergence P: N/A
+    ➤ Communication Cost: 3281011.5
+    ➤ Sparsity W: 0.0000
+    ➤ Sparsity Z: 10.4022
+    ➤ Partition Validity: ✔️
+    ➤ Test Loss: 2.3027
+    ➤ Test Accuracy: 12.9100%
+    🕒 Elapsed Time: 2.4957s
+Learning rate: 0.0100
+tensor(31.3282, device='cuda:0', grad_fn=<AddBackward0>) tensor(inf, device='cuda:0') tensor(0., device='cuda:0')
+Epoch-[001]: Test loss: 1.28, acc: 54.74.
+
+📌 **Epoch 1 Summary**:
+    ➤ Global Loss: 4.6111
+    ➤ Train Accuracy: 1.7076%
+    ➤ ML Loss: 1.7076
+    ➤ Comm Loss: 2888898.9350
+    ➤ P Average Cost: N/A
+    ➤ ADMM Loss: 0.03146455064415932
+    ➤ Agreement Quality: 31.32820701599121
+    ➤ Convergence W: 31.32820701599121
+    ➤ Convergence Z: inf
+    ➤ Convergence P: 0.0
+    ➤ Communication Cost: 2485943.25
+    ➤ Sparsity W: 0.0000
+    ➤ Sparsity Z: 0.0000
+    ➤ Partition Validity: ✔️
+    ➤ Test Loss: 1.2823
+    ➤ Test Accuracy: 54.7400%
+    🕒 Elapsed Time: 17.6327s
+Learning rate: 0.0100
+tensor(24.8277, device='cuda:0', grad_fn=<AddBackward0>) tensor(31.3282, device='cuda:0') tensor(0., device='cuda:0')
+Epoch-[002]: Test loss: 0.99, acc: 65.33.
+
+📌 **Epoch 2 Summary**:
+    ➤ Global Loss: 3.5670
+    ➤ Train Accuracy: 1.3648%
+    ➤ ML Loss: 1.3648
+    ➤ Comm Loss: 2193377.0585
+    ➤ P Average Cost: N/A
+    ➤ ADMM Loss: 0.02081654779613018
+    ➤ Agreement Quality: 24.827747344970703
+    ➤ Convergence W: 24.827747344970703
+    ➤ Convergence Z: 31.32820701599121
+    ➤ Convergence P: 0.0
+    ➤ Communication Cost: 1956665.875
+    ➤ Sparsity W: 0.0000
+    ➤ Sparsity Z: 0.0000
+    ➤ Partition Validity: ✔️
+    ➤ Test Loss: 0.9899
+    ➤ Test Accuracy: 65.3300%
+    🕒 Elapsed Time: 32.6271s
+Learning rate: 0.0100
+tensor(3.4792, device='cuda:0', grad_fn=<AddBackward0>) tensor(24.8277, device='cuda:0') tensor(0., device='cuda:0')
+Epoch-[003]: Test loss: 0.66, acc: 78.34.
+
+📌 **Epoch 3 Summary**:
+    ➤ Global Loss: 3.0216
+    ➤ Train Accuracy: 1.1033%
+    ➤ ML Loss: 1.1033
+    ➤ Comm Loss: 1918112.9316
+    ➤ P Average Cost: N/A
+    ➤ ADMM Loss: 0.00044620316475629807
+    ➤ Agreement Quality: 3.4792356491088867
+    ➤ Convergence W: 3.4792356491088867
+    ➤ Convergence Z: 24.827747344970703
+    ➤ Convergence P: 0.0
+    ➤ Communication Cost: 1886060.375
+    ➤ Sparsity W: 0.0000
+    ➤ Sparsity Z: 0.0000
+    ➤ Partition Validity: ✔️
+    ➤ Test Loss: 0.6605
+    ➤ Test Accuracy: 78.3400%
+    🕒 Elapsed Time: 47.6368s
+hard pruning
+Partition saved to ./experiment_logs/cifar10_resnet18_pr0.5_np4_kernel_Uniform_fixed-pureprune/partition_final
+---------------------------------------------------------------------------
+total number of zeros: 5579616, non-zeros: 5579616, zero sparsity is: 0.5000
+total number of kernels:1392832, zero-kernels:696416, kernel sparsity is: 0.5000
+===========================================================================
+
+
+conv1.weight:   params:1728,           params-intrap:648,         params-interp:216,           interp-k:48,    interp-k(select):24,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.0.conv1.weight:   params:36864,           params-intrap:13698,         params-interp:4734,           interp-k:1024,    interp-k(select):526,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.0.conv2.weight:   params:36864,           params-intrap:13878,         params-interp:4554,           interp-k:1024,    interp-k(select):506,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.1.conv1.weight:   params:36864,           params-intrap:13905,         params-interp:4527,           interp-k:1024,    interp-k(select):503,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.1.conv2.weight:   params:36864,           params-intrap:13914,         params-interp:4518,           interp-k:1024,    interp-k(select):502,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.0.conv1.weight:   params:73728,           params-intrap:27540,         params-interp:9324,           interp-k:2048,    interp-k(select):1036,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.0.conv2.weight:   params:147456,           params-intrap:55584,         params-interp:18144,           interp-k:4096,    interp-k(select):2016,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.0.shortcut.0.weight:   params:8192,           params-intrap:3062,         params-interp:1034,           interp-k:2048,    interp-k(select):1034,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.1.conv1.weight:   params:147456,           params-intrap:55188,         params-interp:18540,           interp-k:4096,    interp-k(select):2060,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.1.conv2.weight:   params:147456,           params-intrap:55620,         params-interp:18108,           interp-k:4096,    interp-k(select):2012,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.0.conv1.weight:   params:294912,           params-intrap:110781,         params-interp:36675,           interp-k:8192,    interp-k(select):4075,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.0.conv2.weight:   params:589824,           params-intrap:222039,         params-interp:72873,           interp-k:16384,    interp-k(select):8097,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.0.shortcut.0.weight:   params:32768,           params-intrap:12280,         params-interp:4104,           interp-k:8192,    interp-k(select):4104,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.1.conv1.weight:   params:589824,           params-intrap:221292,         params-interp:73620,           interp-k:16384,    interp-k(select):8180,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.1.conv2.weight:   params:589824,           params-intrap:221805,         params-interp:73107,           interp-k:16384,    interp-k(select):8123,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.0.conv1.weight:   params:1179648,           params-intrap:442737,         params-interp:147087,           interp-k:32768,    interp-k(select):16343,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.0.conv2.weight:   params:2359296,           params-intrap:885933,         params-interp:293715,           interp-k:65536,    interp-k(select):32635,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.0.shortcut.0.weight:   params:131072,           params-intrap:49165,         params-interp:16371,           interp-k:32768,    interp-k(select):16371,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.1.conv1.weight:   params:2359296,           params-intrap:885258,         params-interp:294390,           interp-k:65536,    interp-k(select):32710,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.1.conv2.weight:   params:2359296,           params-intrap:884097,         params-interp:295551,           interp-k:65536,    interp-k(select):32839,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+---------------------------------------------------------------------------
+total number of kernels:1392832, zero-kernels:696416, kernel sparsity is: 0.5000
+total number of params:11159232, total_interp:2789808, total_interp_select:1391192, total_interpk:348208, total_interpk_select:173696
+total_comms:0, max-interp-comm:0
+===========================================================================
+
+
+Progress saved. Exiting gracefully.
+======== MODEL INFO =========
+ResNet(
+  (conv1): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (layer1): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+      (relu): ReLU()
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+      (relu): ReLU()
+    )
+  )
+  (layer2): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(64, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential(
+        (0): Conv2d(64, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (relu): ReLU()
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+      (relu): ReLU()
+    )
+  )
+  (layer3): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential(
+        (0): Conv2d(128, 256, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (relu): ReLU()
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+      (relu): ReLU()
+    )
+  )
+  (layer4): Sequential(
+    (0): BasicBlock(
+      (conv1): Conv2d(256, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential(
+        (0): Conv2d(256, 512, kernel_size=(1, 1), stride=(2, 2), bias=False)
+        (1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (relu): ReLU()
+    )
+    (1): BasicBlock(
+      (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (bn1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (bn2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (shortcut): Sequential()
+      (relu): ReLU()
+    )
+  )
+  (relu): ReLU()
+  (avg_pool): AvgPool2d(kernel_size=4, stride=4, padding=0)
+  (out): Linear(in_features=512, out_features=10, bias=True)
+)
+========================================
+Computational complexity:       0.556657664
+Number of parameters:           5.586981
+Epoch-[000]: Test loss: 2.83, acc: 10.58.
+Save model
+Learning rate: 0.0010
+Epoch-[001]: Test loss: 0.87, acc: 70.62.
+Save model
+Learning rate: 0.0010
+Epoch-[002]: Test loss: 0.72, acc: 76.93.
+Save model
+Learning rate: 0.0010
+Epoch-[003]: Test loss: 0.69, acc: 77.13.
+Save model
+Learning rate: 0.0010
+Epoch-[004]: Test loss: 0.60, acc: 80.95.
+Save model
+Learning rate: 0.0010
+
+Training interrupted. Saving progress...
+✅ Best accuracy logged at: ./experiment_logs/cifar10_resnet18_pr0.5_np4_kernel_Uniform_fixed-pureprune/best_accuracy.txt
+---------------------------------------------------------------------------
+total number of zeros: 5579616, non-zeros: 5579616, zero sparsity is: 0.5000
+total number of kernels:1392832, zero-kernels:696416, kernel sparsity is: 0.5000
+===========================================================================
+
+
+conv1.weight:   params:1728,           params-intrap:648,         params-interp:216,           interp-k:48,    interp-k(select):24,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.0.conv1.weight:   params:36864,           params-intrap:13698,         params-interp:4734,           interp-k:1024,    interp-k(select):526,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.0.conv2.weight:   params:36864,           params-intrap:13878,         params-interp:4554,           interp-k:1024,    interp-k(select):506,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.1.conv1.weight:   params:36864,           params-intrap:13905,         params-interp:4527,           interp-k:1024,    interp-k(select):503,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer1.1.conv2.weight:   params:36864,           params-intrap:13914,         params-interp:4518,           interp-k:1024,    interp-k(select):502,   max-interp-k(select):0,     outsize:1024, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.0.conv1.weight:   params:73728,           params-intrap:27540,         params-interp:9324,           interp-k:2048,    interp-k(select):1036,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.0.conv2.weight:   params:147456,           params-intrap:55584,         params-interp:18144,           interp-k:4096,    interp-k(select):2016,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.0.shortcut.0.weight:   params:8192,           params-intrap:3062,         params-interp:1034,           interp-k:2048,    interp-k(select):1034,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.1.conv1.weight:   params:147456,           params-intrap:55188,         params-interp:18540,           interp-k:4096,    interp-k(select):2060,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer2.1.conv2.weight:   params:147456,           params-intrap:55620,         params-interp:18108,           interp-k:4096,    interp-k(select):2012,   max-interp-k(select):0,     outsize:256, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.0.conv1.weight:   params:294912,           params-intrap:110781,         params-interp:36675,           interp-k:8192,    interp-k(select):4075,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.0.conv2.weight:   params:589824,           params-intrap:222039,         params-interp:72873,           interp-k:16384,    interp-k(select):8097,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.0.shortcut.0.weight:   params:32768,           params-intrap:12280,         params-interp:4104,           interp-k:8192,    interp-k(select):4104,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.1.conv1.weight:   params:589824,           params-intrap:221292,         params-interp:73620,           interp-k:16384,    interp-k(select):8180,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer3.1.conv2.weight:   params:589824,           params-intrap:221805,         params-interp:73107,           interp-k:16384,    interp-k(select):8123,   max-interp-k(select):0,     outsize:64, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.0.conv1.weight:   params:1179648,           params-intrap:442737,         params-interp:147087,           interp-k:32768,    interp-k(select):16343,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.0.conv2.weight:   params:2359296,           params-intrap:885933,         params-interp:293715,           interp-k:65536,    interp-k(select):32635,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.0.shortcut.0.weight:   params:131072,           params-intrap:49165,         params-interp:16371,           interp-k:32768,    interp-k(select):16371,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.1.conv1.weight:   params:2359296,           params-intrap:885258,         params-interp:294390,           interp-k:65536,    interp-k(select):32710,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+layer4.1.conv2.weight:   params:2359296,           params-intrap:884097,         params-interp:295551,           interp-k:65536,    interp-k(select):32839,   max-interp-k(select):0,     outsize:16, total-interp-comm:0, max-interp-comm:0
+[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+---------------------------------------------------------------------------
+total number of kernels:1392832, zero-kernels:696416, kernel sparsity is: 0.5000
+total number of params:11159232, total_interp:2789808, total_interp_select:1391192, total_interpk:348208, total_interpk_select:173696
+total_comms:0, max-interp-comm:0
+===========================================================================
+
+
+
+=== Progressive Step 2 / 3  |  Prune ratio: 0.75 ===

@@ -118,6 +118,10 @@ class MoP:
             initadmm=ADMM(self.configs, self.model, rho=self.configs['rho'])
             self.configs["new_P"]=initadmm.init_assignment(hard=True)
             admm = initadmm if self.configs['admm'] else None
+            
+            prev_W = {name: W.clone().detach() for name, W in self.model.named_parameters() if name in self.configs['partition']}
+            prev_Z = {name: admm.ADMM_Z[name].clone().detach() if admm else None for name, W in self.model.named_parameters() if name in self.configs['partition']}
+            prev_P = {name: self.configs['partition'][name]['filter_id'].copy() for name in self.configs['partition']['layers']}
             metrics = {}
             
             try:
@@ -131,7 +135,11 @@ class MoP:
                         agreement_quality = sum(torch.norm(W - admm.ADMM_Z[name]) for name, W in self.model.named_parameters() if name in admm.ADMM_Z)
 
                         # Compute Convergence
-                        convergence_W,convergence_Z,convergence_P,convergence_Y=admm.convergence()
+                        convergence_W = sum(torch.norm(W - prev_W[name]) for name, W in self.model.named_parameters() if name in prev_W)
+                        convergence_Z = sum(torch.norm(admm.ADMM_Z[name] - prev_Z[name]) for name, W in self.model.named_parameters() if name in prev_Z)
+                        convergence_P = compute_partition_convergence(prev_P, self.configs['partition'])
+
+                        convergence_W,convergence_Z,convergence_P=admm.convergence()
 
                     test_loss, acc = self.test_model(self.model, criterion, cepoch)
                     
@@ -147,7 +155,6 @@ class MoP:
 
                     # Compute Communication Cost Reduction
                     #comm_cost = compute_comm_cost(self.model, self.configs['partition'])
-                    self.configs["new_P"]=admm.return_assignment(hard=True)
                     comm_cost=comunication_penalty(self.model,initadmm,self.configs,self.configs["new_P"])
 
                     #print("comm_cost=",comm_cost)
@@ -174,7 +181,6 @@ class MoP:
                                convergence_W=convergence_W if cepoch > 0 else 'N/A', 
                                convergence_Z=convergence_Z if cepoch > 0 else 'N/A', 
                                convergence_P=convergence_P if cepoch > 0 else 'N/A', 
-                               #convergence_Y=convergence_Y if cepoch > 0 else 'N/A', 
                                comm_cost=comm_cost, 
                                constraint_sparsity_W=sparsity_W, 
                                constraint_sparsity_Z=sparsity_Z, 
@@ -184,6 +190,11 @@ class MoP:
                                P_costs=metrics['P_costs'] if cepoch > 0 else 'N/A',
                                elapsed_time= time.time() - start_time
                     )
+
+                    prev_W = {name: W.clone().detach() for name, W in self.model.named_parameters() if name in prev_W}
+                    prev_Z = {name: admm.ADMM_Z[name].clone().detach() if admm else None for name, W in self.model.named_parameters() if name in prev_Z}
+                    prev_P = {name: self.configs['partition'][name]['filter_id'].copy() for name in self.configs['partition']['layers']}
+            
             except KeyboardInterrupt:
                 print("\nTraining interrupted. Saving progress...")
             

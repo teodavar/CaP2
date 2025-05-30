@@ -96,13 +96,13 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             admm_adjust_learning_rate(optimizer, cepoch, configs)
         else:
             scheduler.step()
-        
+        c=False
         if ADMM is not None:
             admm_epochs, sparsity_type = configs['admm_epochs'], configs['sparsity_type']
-            if (cepoch != 1 and (cepoch - 1) % admm_epochs == 0 and batch_idx == 0) or True: #TT
+            if (cepoch != 1 and (cepoch - 1) % admm_epochs == 0 and batch_idx == 0) or c: #TT
                 ADMM.Z_update(configs, model)
                 ADMM.U_update(configs, model)
-        if ADMM is not None and ((configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0) or True): #TT
+        if ADMM is not None and ((configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0) or c): #TT
             ADMM.update_assignment()
 
 
