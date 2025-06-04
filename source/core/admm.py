@@ -30,9 +30,9 @@ def translate_to_tensor(L):
 class ADMM:
     def __init__(self, config_dict, model, rho=0.001, target='weight',approach="original",penalty="full"):
         self.approach=approach
-        self.penalty=penalty
+        self.penalty=penalty #"aggregate_partition_rows","full"
         self.config=config_dict
-        self.sparcity_type="partition_row"#config_dict['sparsity_type']
+        self.sparcity_type="partition_row"#config_dict['sparsity_type'],"irregular"
         self.model=model
         self.ADMM_U = {}
         self.ADMM_Z = {}
@@ -84,6 +84,11 @@ class ADMM:
         self.prev_Z=copy.deepcopy(self.ADMM_Z)
         self.prev_Y=copy.deepcopy(self.Y)
         self.prev_P=copy.deepcopy(self.P)
+    def agreement(self):
+        agreement_W = sum(torch.norm(self.W[name] - self.ADMM_Z[name]) for name in self.layers)
+        agreement_P = sum(torch.norm(self.P[name] - self.Y[name]) for name in self.layers)
+        return agreement_W,agreement_P
+        
     def convergence(self):
         convergence_W = sum(torch.norm(self.W[name] - self.prev_W[name]) for name in self.layers)
         convergence_Z = sum(torch.norm(self.ADMM_Z[name] - self.prev_Z[name]) for name in self.layers)
@@ -250,17 +255,18 @@ class ADMM:
                 weight=mask*weight
             return weight
     
-    def comunication_penalty(self,hard=False,dif=False):
-        if self.approach=="original":
-            P=self.P
-        if self.approach=="relaxed":
-            if hard==False:
+    def comunication_penalty(self,hard=False,dif=False,P=None):
+        if P==None:
+            if self.approach=="original":
                 P=self.P
-            else:
-                P=self.Y
+            if self.approach=="relaxed":
+                if hard==False:
+                    P=self.P
+                else:
+                    P=self.Y
         if self.penalty=="full":
             comm=comunication_penalty(self.model,self,self.config,P)
-        if self.penalty=="agregate_partition_rows":
+        if self.penalty=="aggregate_partition_rows":
             comm=comunication_penalty2(self.model,self,self.config,P,dif)
         return comm  
     
@@ -304,7 +310,12 @@ class ADMM:
         for i in range(1,len(parents)):
             P+=Ps[parents[i]]
         #print(E.device,P.device,self.C.device)
-        Cl=E @ P @ self.C
+        if self.penalty=="full":
+            needs=E@P
+        elif self.penalty=="aggregate_partiotion_rows":
+            needs=E@P
+            needs=needs[needs!=0]=1
+        Cl=needs @ self.C
 
         #print(E.shape,P.shape,self.C.shape,Cl.shape)
         return Cl

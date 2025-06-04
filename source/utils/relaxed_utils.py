@@ -168,7 +168,7 @@ def solve_relaxed_assignment(model,ADMM,configs):
         optimizer.zero_grad()
         with torch.enable_grad():
             
-            loss = comunication_penalty(model,ADMM,configs,ADMM.P)
+            loss = ADMM.comunication_penalty(dif=True,P=ADMM.P)
             #abs(loss)
             loss+=center_norm(model,ADMM,configs)
         loss.backward()

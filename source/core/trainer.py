@@ -68,14 +68,8 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             admm_loss= ADMM.compute_admm_loss(model)  
             total_loss+=admm_loss
             
-        if comm:
-            #v1: abs(W)*comm_cost
-            if not configs['reassign'] or old_comm_loss: 
-                comm_loss=ADMM.comunication_penalty()
-            #v3: take into account inference split
-            else: 
-                #alternative communication penalty !!!!!!!!!!!!!!
-                print("not yet")
+        if ADMM is not None and comm: 
+            comm_loss=ADMM.comunication_penalty(dif=True)
                     
             total_loss += configs['lambda_comm'] * comm_loss + configs['lambda_comp'] * comp_loss
             # print('total_loss:', total_loss)
@@ -103,7 +97,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
                 ADMM.Z_update(configs, model)
                 ADMM.U_update(configs, model)
         if ADMM is not None and ((configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0) or c): #TT
-            ADMM.update_assignment()
+            P_costs=ADMM.update_assignment()
 
 
 

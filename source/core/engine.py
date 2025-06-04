@@ -128,8 +128,7 @@ class MoP:
                         metrics = standard_train(self.configs, cepoch, self.model, self.train_loader, 
                                     criterion, optimizer, scheduler, ADMM=admm, comm=True, old_comm_loss=True)
                         # Compute Agreement Quality ||Z - W||
-                        agreement_quality = sum(torch.norm(W - admm.ADMM_Z[name]) for name, W in self.model.named_parameters() if name in admm.ADMM_Z)
-
+                        agreement_W,agreement_P=admm.agreement()
                         # Compute Convergence
                         convergence_W,convergence_Z,convergence_P,convergence_Y=admm.convergence()
 
@@ -149,6 +148,7 @@ class MoP:
                     #comm_cost = compute_comm_cost(self.model, self.configs['partition'])
                     self.configs["new_P"]=admm.return_assignment(hard=True)
                     comm_cost=comunication_penalty(self.model,initadmm,self.configs,self.configs["new_P"])
+                    comm_cost2=comunication_penalty2(self.model,initadmm,self.configs,self.configs["new_P"],False)
 
                     #print("comm_cost=",comm_cost)
                     
@@ -170,12 +170,14 @@ class MoP:
                                ML_loss=metrics['batch_loss'].avg if cepoch > 0 else 'N/A', 
                                comm_loss=metrics['batch_comm'].avg if cepoch > 0 else 'N/A', 
                                ADMM_loss=metrics['admm_loss'] if cepoch > 0 else 'N/A',  
-                               agreement_quality=agreement_quality if cepoch > 0 else 'N/A', 
+                               agreement_quality=agreement_W if cepoch > 0 else 'N/A',
+                               #agreement_Z=agreement_Z if cepoch > 0 else 'N/A',
                                convergence_W=convergence_W if cepoch > 0 else 'N/A', 
                                convergence_Z=convergence_Z if cepoch > 0 else 'N/A', 
                                convergence_P=convergence_P if cepoch > 0 else 'N/A', 
                                #convergence_Y=convergence_Y if cepoch > 0 else 'N/A', 
                                comm_cost=comm_cost, 
+                               #comm_cost2=comm_cost2, 
                                constraint_sparsity_W=sparsity_W, 
                                constraint_sparsity_Z=sparsity_Z, 
                                partition_validity=partition_validity,
