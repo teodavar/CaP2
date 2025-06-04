@@ -86,7 +86,7 @@ def layer_penalty_com2(ADMM,name,E,P,dif=False):
             needs=torch.tanh(t*needs)
         costs=Pout@C
         res2=needs*costs
-        comm_costs+=np.sum(res2)
+        comm_costs+=torch.sum(res2)
         #print(ra.P[parent].shape)
         #print(ra.C.shape)
         #print(torch.transpose(ra.P[name],0,1).shape )

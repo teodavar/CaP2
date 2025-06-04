@@ -32,7 +32,7 @@ class ADMM:
         self.approach=approach
         self.penalty=penalty #"aggregate_partition_rows","full"
         self.config=config_dict
-        self.sparcity_type="partition_row"#config_dict['sparsity_type'],"irregular"
+        self.sparsity_type="partition_row"#config_dict['sparsity_type'],"irregular"
         self.model=model
         self.ADMM_U = {}
         self.ADMM_Z = {}
