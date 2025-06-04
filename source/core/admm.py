@@ -28,9 +28,11 @@ def translate_to_tensor(L):
     return tensor.to(device='cuda')
 
 class ADMM:
-    def __init__(self, config_dict, model, rho=0.001, target='weight',approach="original"):
+    def __init__(self, config_dict, model, rho=0.001, target='weight',approach="original",penalty="full"):
         self.approach=approach
+        self.penalty=penalty
         self.config=config_dict
+        self.sparcity_type="partition_row"#config_dict['sparsity_type']
         self.model=model
         self.ADMM_U = {}
         self.ADMM_Z = {}
@@ -166,8 +168,7 @@ class ADMM:
                cross_x=4,
                cross_f=1):
         #print("Z update")
-        admm_epochs, sparsity_type = config_dict['admm_epochs'], config_dict['sparsity_type']
-        
+        admm_epochs, sparsity_type = config_dict['admm_epochs'],self.sparsity_type 
         for i, (name, W) in enumerate(model.named_parameters()):
             if name not in self.prune_ratios:
                 continue          
@@ -187,7 +188,7 @@ class ADMM:
                cross_x=4,
                cross_f=1):
         #print("U update")
-        admm_epochs, sparsity_type = config_dict['admm_epochs'], config_dict['sparsity_type']
+        admm_epochs, sparsity_type = config_dict['admm_epochs'], self.sparsity_type
  
         for i, (name, W) in enumerate(model.named_parameters()):
             if name not in self.prune_ratios:
@@ -214,7 +215,7 @@ class ADMM:
             P+=self.Y[parents[i]]
         P[P!=0]=1
         
-        if (sparsity_type == "irregular") and False:
+        if (sparsity_type == "irregular") :
             weight = weight.cpu().detach().numpy()
             weight_temp = np.abs(
                 weight)  # a buffer that holds weights with absolute values
@@ -227,7 +228,7 @@ class ADMM:
             )  # has to convert bool to float32 for numpy-tensor conversion
             weight[under_threshold] = 0
             return torch.from_numpy(above_threshold).to(device), torch.from_numpy(weight).to(device)
-        elif sparsity_type == "partition_row" or True:
+        elif sparsity_type == "partition_row" :
             E=W**2
             needs=torch.sqrt(E@P)
             #W[W!=0]=1
@@ -249,16 +250,22 @@ class ADMM:
                 weight=mask*weight
             return weight
     
-    def comunication_penalty(self,hard=False):
+    def comunication_penalty(self,hard=False,dif=False):
         if self.approach=="original":
-            comm=comunication_penalty(self.model,self,self.config,self.P)
+            P=self.P
         if self.approach=="relaxed":
             if hard==False:
-                comm=comunication_penalty(self.model,self,self.config,self.P)
+                P=self.P
             else:
-                comm=comunication_penalty(self.model,self,self.config,self.Y)
-        return comm    
-
+                P=self.Y
+        if self.penalty=="full":
+            comm=comunication_penalty(self.model,self,self.config,P)
+        if self.penalty=="agregate_partition_rows":
+            comm=comunication_penalty2(self.model,self,self.config,P,dif)
+        return comm  
+    
+    def getE(self,W):
+        return torch.norm(W, dim=(2, 3))
     def update_assignment(self):
         P_costs=[]
         if self.approach=="original":

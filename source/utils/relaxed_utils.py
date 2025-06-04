@@ -66,6 +66,34 @@ def layer_penalty_com(layer_name,ADMM,P):
     #print(comm_costs.shape)
     return torch.transpose(comm_costs,0,1).to(ADMM.device)
 
+def layer_penalty_com2(ADMM,name,E,P,dif=False):
+    #TT 
+    n=ADMM.layer_info[name]['layer_size']
+    parents = ADMM.layer_info[name].get('parents', [])
+    if len(parents)==0:
+        return 0
+    np=ADMM.layer_info[parents[0]]['layer_size']
+    comm_costs = 0
+    C=ADMM.C.to(ADMM.device)
+    for parent in parents:
+        Pin=P[parent]
+        Pout=P[name]
+        needs=E@Pin
+        if dif==False:
+            needs[needs!=0]=1
+        else:
+            t=1
+            needs=torch.tanh(t*needs)
+        costs=Pout@C
+        res2=needs*costs
+        comm_costs+=np.sum(res2)
+        #print(ra.P[parent].shape)
+        #print(ra.C.shape)
+        #print(torch.transpose(ra.P[name],0,1).shape )
+        #print(ADMM.P[parent].device,C.device,ADMM.P[name].device)  
+    #print(comm_costs.shape)
+    return comm_costs
+
 def comunication_penalty(model,ADMM,configs,P):
     comm_loss=0
     for (name, W) in model.named_parameters():
@@ -73,8 +101,25 @@ def comunication_penalty(model,ADMM,configs,P):
             #TT
             #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name)
             #print(torch.abs(W).sum((2,3)) .shape,penalty_com(ra,name,device="cuda").shape)
-            comm_cost = torch.norm(W, dim=(2, 3)) * layer_penalty_com(name,ADMM,P)
+            E=ADMM.getE(W)
+            comm_cost = E * layer_penalty_com(name,ADMM,P)
             comm_cost = comm_cost.view(comm_cost.size(0), -1).sum()
+            #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name,comm_cost)
+            if configs['comm_outsize']:
+                comm_loss += comm_cost*ADMM.layer_info[name]['outsize']
+            else:
+                comm_loss += comm_cost
+    return comm_loss
+
+def comunication_penalty2(model,ADMM,configs,P,dif=False):
+    comm_loss=0
+    for (name, W) in model.named_parameters():
+        if name in ADMM.prune_ratios:
+            #TT
+            #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name)
+            #print(torch.abs(W).sum((2,3)) .shape,penalty_com(ra,name,device="cuda").shape)
+            E=ADMM.getE(W)
+            comm_cost = layer_penalty_com2(ADMM,name,E,P,dif)
             #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name,comm_cost)
             if configs['comm_outsize']:
                 comm_loss += comm_cost*ADMM.layer_info[name]['outsize']
