@@ -136,10 +136,13 @@ class ExperimentLogger:
             'comm_loss': [],
             'ADMM_loss': [],
             'agreement_quality': [],  # ||Z - W||
+            'agreement_P': [],  #TT
             'convergence_W': [],  # ||W_t - W_{t-1}||
             'convergence_Z': [],  # ||Z_t - Z_{t-1}||
             'convergence_P': [],  # ||P_t - P_{t-1}||
+            'convergence_Y': [], #TT
             'comm_cost': [],  # Communication cost over training
+            'comm_cost2': [],  #TT
             'constraint_sparsity_W': [],
             'constraint_sparsity_Z': [],
             'partition_validity': [],
@@ -156,11 +159,13 @@ class ExperimentLogger:
             if key == 'P_costs':
                 if value != 'N/A' and len(value) > 0:
                     self.logs[key].extend(value)
+                    print("KEY:", key, value)
                     P_avg = np.mean(value)
             else:
                 self.logs[key].append(value)
         
         # Print metrics at the end of each epoch
+        print("+++++++++++++ LOGGING ++++++++++++++")
         print(f"\n📌 **Epoch {epoch} Summary**:")
         print(f"    ➤ Global Loss: {format_metric(kwargs.get('global_loss', 'N/A'))}")
         print(f"    ➤ Train Accuracy: {format_metric(kwargs.get('train_acc', 'N/A'), '%')}")
@@ -169,10 +174,13 @@ class ExperimentLogger:
         print(f"    ➤ P Average Cost: {format_metric(P_avg)}")
         print(f"    ➤ ADMM Loss: {format_metric(kwargs.get('ADMM_loss', 'N/A'))}")
         print(f"    ➤ Agreement Quality: {format_metric(kwargs.get('agreement_quality', 'N/A'))}")
+        print(f"    ➤ Agreement P: {format_metric(kwargs.get('agreement_P', 'N/A'))}") #TT
         print(f"    ➤ Convergence W: {format_metric(kwargs.get('convergence_W', 'N/A'))}")
         print(f"    ➤ Convergence Z: {format_metric(kwargs.get('convergence_Z', 'N/A'))}")
         print(f"    ➤ Convergence P: {format_metric(kwargs.get('convergence_P', 'N/A'))}")
+        print(f"    ➤ Convergence Y: {format_metric(kwargs.get('convergence_Y', 'N/A'))}") #TT
         print(f"    ➤ Communication Cost: {format_metric(kwargs.get('comm_cost', 'N/A'))}")
+        print(f"    ➤ Communication Cost 2: {format_metric(kwargs.get('comm_cost2', 'N/A'))}") #TT
         print(f"    ➤ Sparsity W: {format_metric(kwargs.get('constraint_sparsity_W', 'N/A'))}")
         print(f"    ➤ Sparsity Z: {format_metric(kwargs.get('constraint_sparsity_Z', 'N/A'))}")
         print(f"    ➤ Partition Validity: {'✔️' if kwargs.get('partition_validity', False) else '❌'}")

@@ -1,47 +1,48 @@
-device: cuda ################################# TEO
+device: cuda # TT
 model: resnet18
 data_code: cifar10
 num_classes: 10
 log_dir: ./experiment_logs
 
 # Weights & Biases configuration
-use_wandb: False    # TEO
-wandb_project: test_ADMM
-wandb_entity: None
+use_wandb: False    # TT
+wandb_project: cap2_project_2  # TT
+wandb_entity: None  #TT teodav-northeastern-university
 
 # Parameters to tune
 experiment_name: Uniform
-sparsity_type: kernel
+approach: relaxed # Valid values: original, relaxed # TT
+penalty: aggregate_partition_rows # Valid values: aggregate_partition_rows, full  # TT
+sparsity_type: partition_row # Valid values: partition_row, irregular  # TT
 reassign: False
 reassign_freq: 5
 create_partition: False
 budget: [1,1,1,1]
 input_partition: [1,1,1,1]
-extra_tag: "pureprune"
+extra_tag: "pureprune" 
 
-epochs: 10 # TEO 300
+epochs: 5 # TT 300
 batch_size: 128
 optimizer: sgd
 lr_scheduler : default
 learning_rate: 0.01
 seed: 1234
 
-prune_ratio: [0.5, 0.75, 0.85] 
+prune_ratio: [0.5] # TT [0.5, 0.75, 0.85]
 admm: True
-admm_epochs: 3   # TEO 40
+admm_epochs: 7   # TT 40
 rho: 0.001
 multi_rho: True
 retrain_bs: 128
 retrain_lr: 0.001
-retrain_ep: 40
+retrain_ep: 9  # TT 40
 retrain_opt: default
-
 
 xentropy_weight: 1.
 
 warmup : False
 warmup_lr :  0.001
-warmup_epochs :  2  # TEO 10
+warmup_epochs : 3  # TT 10
 mix_up :  True
 alpha :  0.3
 smooth :  False
@@ -56,6 +57,6 @@ par_first_layer: True
 comm_outsize: True
 lambda_comm: 0.000001
 lambda_comp: 0
-load_dense_model: True # TEO
+load_dense_model: True # TT
 load_dense_model_file: cifar10-resnet18.pt
 load_pruned_model: False

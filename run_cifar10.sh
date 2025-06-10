@@ -5,6 +5,10 @@
 dataset=cifar10
 model=resnet18
 
+approach=relaxed
+penalty=aggregate_partition_rows
+exp=long_full
+
 # dataset=cifar100
 # model=wrn28_10
 
@@ -19,7 +23,7 @@ teacher=${dataset}-${model}.pt
 # -lm ${teacher} \
 
 prune_finetune() {
-    log_name=${dataset}-${model}-$(date +"%Y-%m-%d_%H:%M:%S")
+    log_name=${dataset}-${model}-${approach}-${penalty}-${exp}-$(date +"%Y-%m-%d_%H:%M:%S")
     python -m source.core.run_partition \
            -cfg config/${dataset}.yaml \
            >experiment_logs/${log_name}.out

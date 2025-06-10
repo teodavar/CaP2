@@ -66,16 +66,17 @@ def layer_penalty_com(layer_name,ADMM,P):
     #print(comm_costs.shape)
     return torch.transpose(comm_costs,0,1).to(ADMM.device)
 
-def layer_penalty_com2(ADMM,name,E,P,dif=False):
+def layer_penalty_com2(ADMM,name,E,P,dif=False, ret=False):
     #TT 
-    n=ADMM.layer_info[name]['layer_size']
+    #n=ADMM.layer_info[name]['layer_size']
     parents = ADMM.layer_info[name].get('parents', [])
     if len(parents)==0:
         return 0
-    np=ADMM.layer_info[parents[0]]['layer_size']
+    #np=ADMM.layer_info[parents[0]]['layer_size']
     comm_costs = 0
     C=ADMM.C.to(ADMM.device)
     for parent in parents:
+        #print("----- parent: ", parent)
         Pin=P[parent]
         Pout=P[name]
         needs=E@Pin
@@ -88,13 +89,15 @@ def layer_penalty_com2(ADMM,name,E,P,dif=False):
         res2=needs*costs
         comm_costs+=torch.sum(res2)
         #print(ra.P[parent].shape)
-        #print(ra.C.shape)
+        #print("@@@@@ res2.shape:", res2.shape)
         #print(torch.transpose(ra.P[name],0,1).shape )
         #print(ADMM.P[parent].device,C.device,ADMM.P[name].device)  
-    #print(comm_costs.shape)
+    #print("&&&&& comm_costs: ", comm_costs)
+    #if ret and name==ADMM.layers[3]:
+        #print("###### needs: ", needs)
     return comm_costs
 
-def comunication_penalty(model,ADMM,configs,P):
+def comunication_penalty1(model,ADMM,configs,P):
     comm_loss=0
     for (name, W) in model.named_parameters():
         if name in ADMM.prune_ratios:
@@ -111,20 +114,44 @@ def comunication_penalty(model,ADMM,configs,P):
                 comm_loss += comm_cost
     return comm_loss
 
-def comunication_penalty2(model,ADMM,configs,P,dif=False):
+def comunication_penalty2(model,ADMM,configs,P,dif=False, ret=False):
     comm_loss=0
+    l = []
+    ccms = []
+    lys = []
     for (name, W) in model.named_parameters():
         if name in ADMM.prune_ratios:
             #TT
-            #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name)
+            #print("+++++ name, W.shape:, ", name, W.shape)
             #print(torch.abs(W).sum((2,3)) .shape,penalty_com(ra,name,device="cuda").shape)
             E=ADMM.getE(W)
-            comm_cost = layer_penalty_com2(ADMM,name,E,P,dif)
-            #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name,comm_cost)
+            #print("+++++ E.shape:, ", name, E.shape)
+            comm_cost = layer_penalty_com2(ADMM,name,E,P,dif, ret)
+            ccms.append(comm_cost.item())
+            #print("\n!!!!!!!!!!!!! after layer_penalty_com2 !!!!!!!!!!!!!!!!!!!!!!!!",name,comm_cost)
             if configs['comm_outsize']:
                 comm_loss += comm_cost*ADMM.layer_info[name]['outsize']
+                lys.append(ADMM.layer_info[name]['outsize'])
+                l.append(comm_loss.item())
+
+                #print("\n!!!!!!!!!!! ADMM.layer_info[name]['outsize']", ADMM.layer_info[name]['outsize'])
+                #print("\n!!!!!!!!!!!!! in comm_outsize",comm_loss)
             else:
                 comm_loss += comm_cost
+                l.append(comm_loss.item())
+                #print("\n!!!!!!!!!!!!! out comm_outsize",comm_loss)
+            '''
+            if ret and name==ADMM.layers[3]:
+                print("###### P: ", P[name])
+                print("###### W: ", W)
+                print("###### E: ", E)
+                print("###### comm_cost: ", comm_cost)
+            '''   
+    if ret:
+        #print("======= ccms: ", ccms)
+        #print("======= lys: ", lys)
+        return comm_loss, l
+    
     return comm_loss
 
 def center_norm(model,ADMM,configs):

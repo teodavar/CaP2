@@ -129,6 +129,7 @@ class MoP:
                                     criterion, optimizer, scheduler, ADMM=admm, comm=True, old_comm_loss=True)
                         # Compute Agreement Quality ||Z - W||
                         agreement_W,agreement_P=admm.agreement()
+                        #print("!!! agreement_W: ", agreement_W)
                         # Compute Convergence
                         convergence_W,convergence_Z,convergence_P,convergence_Y=admm.convergence()
 
@@ -147,10 +148,13 @@ class MoP:
                     # Compute Communication Cost Reduction
                     #comm_cost = compute_comm_cost(self.model, self.configs['partition'])
                     self.configs["new_P"]=admm.return_assignment(hard=True)
-                    comm_cost=comunication_penalty(self.model,initadmm,self.configs,self.configs["new_P"])
-                    comm_cost2=comunication_penalty2(self.model,initadmm,self.configs,self.configs["new_P"],False)
+                    #print("!!!!! new P: ", self.configs["new_P"][initadmm.layers[3]])
+                    #print("!!!!! new W: ", initadmm.W[initadmm.layers[3]])
+                    #print("!!!!! ADMM.getE(initadmm.W[initadmm.layers[3]]):", initadmm.getE(initadmm.W[initadmm.layers[3]]))
+                    comm_cost=comunication_penalty1(self.model,initadmm,self.configs,self.configs["new_P"])
+                    comm_cost2,l =comunication_penalty2(self.model,initadmm,self.configs,self.configs["new_P"],dif=False, ret=True)
 
-                    #print("comm_cost=",comm_cost)
+                    #print("!!!! comm_cost2=",comm_cost2, l)
                     
 
                     # Check Sparsity Constraint
@@ -171,13 +175,13 @@ class MoP:
                                comm_loss=metrics['batch_comm'].avg if cepoch > 0 else 'N/A', 
                                ADMM_loss=metrics['admm_loss'] if cepoch > 0 else 'N/A',  
                                agreement_quality=agreement_W if cepoch > 0 else 'N/A',
-                               #agreement_Z=agreement_Z if cepoch > 0 else 'N/A',
+                               agreement_P=agreement_P if cepoch > 0 else 'N/A', #TT
                                convergence_W=convergence_W if cepoch > 0 else 'N/A', 
                                convergence_Z=convergence_Z if cepoch > 0 else 'N/A', 
                                convergence_P=convergence_P if cepoch > 0 else 'N/A', 
-                               #convergence_Y=convergence_Y if cepoch > 0 else 'N/A', 
+                               convergence_Y=convergence_Y if cepoch > 0 else 'N/A', # TT
                                comm_cost=comm_cost, 
-                               #comm_cost2=comm_cost2, 
+                               comm_cost2=comm_cost2, # TT
                                constraint_sparsity_W=sparsity_W, 
                                constraint_sparsity_Z=sparsity_Z, 
                                partition_validity=partition_validity,

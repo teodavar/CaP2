@@ -4,6 +4,7 @@ from .engine import *
 from os import environ
 import wandb
 
+
 def get_args():
     """ args from input
     """
@@ -25,6 +26,8 @@ def get_args():
     ### arguments for pruning
     parser.add_argument('-cp', '--create_partition', default=False, type=bool, help='Create partition mapping and save to yaml file')
     parser.add_argument('-st', '--sparsity_type', default='', type=str, help='for pruning')
+    parser.add_argument('-ap', '--approach', default='', type=str, help='approach') # TT
+    parser.add_argument('-pen', '--penalty', default='', type=str, help='penalty') # TT
     parser.add_argument('-pr', '--prune_ratio', default=1, type=float, help='pruning ratio')
     parser.add_argument('--admm', action='store_true', help='prune by admm')
     parser.add_argument('--admm_epochs', default=300, type=int, help='number of interval epochs to update admm (default: 1)')
@@ -174,6 +177,14 @@ def main():
     # if args.sparsity_type:
     if 'sparsity_type' not in config_dict and args.sparsity_type:
         config_dict['sparsity_type'] = args.sparsity_type
+    # TT
+    # if args.approach: 
+    if 'approach' not in config_dict and args.approach:
+        config_dict['approach'] = args.approach
+    # TT
+    # if args.penalty:
+    if 'penalty' not in config_dict and args.penalty:
+        config_dict['penalty'] = args.penalty
     if 'prune_ratio' not in config_dict and (args.prune_ratio or args.prune_ratio) == 0:
     # if 'prune_ratio' not in config_dict and args.prune_ratio:
         config_dict['prune_ratio'] = args.prune_ratio
@@ -301,13 +312,26 @@ if __name__ == "__main__":
             experiment_flag = configs['experiment_name'] if 'experiment_name' in configs else "uniform"
             reassign_flag = f"rsgn{configs['reassign_freq']}" if configs['reassign'] else "fixed"
             extra_tag = f"-{configs['extra_tag']}" if configs['extra_tag'] else "" 
-            experiment_id = f"{configs['data_code']}_{configs['model']}_pr{pr_ratio}_np{configs['num_partition']}_{configs['sparsity_type']}_{experiment_flag}_{reassign_flag}{extra_tag}"
+            # TT
+            new_tag = f"{configs['approach']}_{configs['penalty']}_{configs['admm_epochs']}" if configs['approach'] else "" 
+            if configs['approach']:
+                experiment_id = f"{configs['data_code']}_{configs['model']}_pr{pr_ratio}_np{configs['num_partition']}_{configs['sparsity_type']}_{experiment_flag}_{reassign_flag}_{new_tag}"
+            else:
+                experiment_id = f"{configs['data_code']}_{configs['model']}_pr{pr_ratio}_np{configs['num_partition']}_{configs['sparsity_type']}_{experiment_flag}_{reassign_flag}_{extra_tag}"
+            # TT
+
             configs['experiment_dir'] = os.path.join(configs['log_dir'], experiment_id)
             
+            
             if configs.get('use_wandb', False):
+
+                #wandb.login()
+
+                print("!!!! WANDB project: ", experiment_id)
+
                 wandb.init(
                     project=configs.get('wandb_project', "DefaultProject"),
-                    entity=configs.get('wandb_entity', None),
+                    #entity=configs.get('wandb_entity', None),      # TT wandb crashes with permission errors !!!
                     name=experiment_id,
                     config={k: v for k, v in configs.items() if k != "partition"},
                 )

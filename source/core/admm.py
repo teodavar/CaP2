@@ -29,10 +29,10 @@ def translate_to_tensor(L):
 
 class ADMM:
     def __init__(self, config_dict, model, rho=0.001, target='weight',approach="original",penalty="full"):
-        self.approach=approach
-        self.penalty=penalty #"aggregate_partition_rows","full"
+        self.approach=config_dict['approach'] # "original", "relaxed"
+        self.penalty=config_dict['penalty'] #"aggregate_partition_rows","full"
         self.config=config_dict
-        self.sparsity_type="partition_row"#config_dict['sparsity_type'],"irregular"
+        self.sparsity_type=config_dict['sparsity_type'] # "irregular", "partition_row"
         self.model=model
         self.ADMM_U = {}
         self.ADMM_Z = {}
@@ -72,6 +72,8 @@ class ADMM:
                 self.W[name]=W
         self.init_convergence()
 
+        print("!!!! ADMM runs with: ", self.approach, self.penalty, self.sparsity_type)
+
 
 
     def return_assignment(self,hard=True):
@@ -98,7 +100,7 @@ class ADMM:
         self.prev_Z=copy.deepcopy(self.ADMM_Z)
         self.prev_Y=copy.deepcopy(self.Y)
         self.prev_P=copy.deepcopy(self.P)
-        #print(convergence_W,convergence_Z,convergence_P)
+        #print("!!!! Convergence values: ", convergence_W,convergence_Z,convergence_P, convergence_Y)
         return convergence_W,convergence_Z,convergence_P,convergence_Y
 
     def init_assignment(self,hard=False):
@@ -265,7 +267,7 @@ class ADMM:
                 else:
                     P=self.Y
         if self.penalty=="full":
-            comm=comunication_penalty(self.model,self,self.config,P)
+            comm=comunication_penalty1(self.model,self,self.config,P)
         if self.penalty=="aggregate_partition_rows":
             comm=comunication_penalty2(self.model,self,self.config,P,dif)
         return comm  
@@ -279,7 +281,7 @@ class ADMM:
             start=time.time()
             solve_original_assignment(self) 
             #print(time.time()-start)
-            P_costs.append(self.comunication_penalty())
+            P_costs.append(self.comunication_penalty().item()) # TT
         elif self.approach=="relaxed":
             #print("timing P")
             start=time.time()
@@ -294,7 +296,7 @@ class ADMM:
             V_update(self.model,self,self.config) 
             #print(time.time()-start)
             start=time.time()
-            P_costs.append(self.comunication_penalty(hard=True))
+            P_costs.append(self.comunication_penalty(hard=True).item()) #TT
         return P_costs
 
     def linear_cost_matrix(self,name):
@@ -312,7 +314,7 @@ class ADMM:
         #print(E.device,P.device,self.C.device)
         if self.penalty=="full":
             needs=E@P
-        elif self.penalty=="aggregate_partiotion_rows":
+        elif self.penalty=="aggregate_partition_rows":
             needs=E@P
             needs=needs[needs!=0]=1
         Cl=needs @ self.C

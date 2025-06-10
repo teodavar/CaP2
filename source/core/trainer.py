@@ -26,13 +26,16 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         ADMM.Z_update(configs, model)
 
     
-    
-    
-    
     start_time = time.time()
     n_data = configs['batch_size'] * len(data_loader)
     pbar = tqdm(enumerate(data_loader), total=n_data/configs['batch_size'], ncols=150)
     for batch_idx, batch in pbar:
+        #print("!!!!!!!!!!! BATCH IDX: ", batch_idx)
+        # TT
+        # Run for smaller dataset
+        
+        if batch_idx > 20:
+            break
         
         data   = ()
         for piece in batch[:-1]:
@@ -90,10 +93,11 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             admm_adjust_learning_rate(optimizer, cepoch, configs)
         else:
             scheduler.step()
-        c=False
+        c=True  # TT
         if ADMM is not None:
             admm_epochs, sparsity_type = configs['admm_epochs'], configs['sparsity_type']
             if (cepoch != 1 and (cepoch - 1) % admm_epochs == 0 and batch_idx == 0) or c: #TT
+                #print("!!!!!! HAHAHAHA: ", cepoch, batch_idx)
                 ADMM.Z_update(configs, model)
                 ADMM.U_update(configs, model)
         if ADMM is not None and ((configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0) or c): #TT
