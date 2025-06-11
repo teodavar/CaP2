@@ -5,7 +5,7 @@ num_classes: 10
 log_dir: ./experiment_logs
 
 # Weights & Biases configuration
-use_wandb: False    # TT
+use_wandb: True    # TT
 wandb_project: cap2_project_2  # TT
 wandb_entity: None  #TT teodav-northeastern-university
 
@@ -14,7 +14,7 @@ experiment_name: Uniform
 approach: relaxed # Valid values: original, relaxed # TT
 penalty: aggregate_partition_rows # Valid values: aggregate_partition_rows, full  # TT
 sparsity_type: partition_row # Valid values: partition_row, irregular  # TT
-reassign: False
+reassign: True
 reassign_freq: 5
 create_partition: False
 budget: [1,1,1,1]
@@ -22,6 +22,7 @@ input_partition: [1,1,1,1]
 extra_tag: "pureprune" 
 
 epochs: 5 # TT 300
+theta_epochs: 2 # TT
 batch_size: 128
 optimizer: sgd
 lr_scheduler : default

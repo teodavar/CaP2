@@ -93,15 +93,16 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             admm_adjust_learning_rate(optimizer, cepoch, configs)
         else:
             scheduler.step()
-        c=True  # TT
-        if ADMM is not None:
-            admm_epochs, sparsity_type = configs['admm_epochs'], configs['sparsity_type']
-            if (cepoch != 1 and (cepoch - 1) % admm_epochs == 0 and batch_idx == 0) or c: #TT
-                #print("!!!!!! HAHAHAHA: ", cepoch, batch_idx)
+        c=False  # TT
+        if (cepoch != 1 and batch_idx == 0 and (cepoch-1) % configs['theta_epochs'] == 0) or c:
+            if ADMM is not None:
+                print("\n!!!!!! Running Updates for ", cepoch, batch_idx)
                 ADMM.Z_update(configs, model)
                 ADMM.U_update(configs, model)
-        if ADMM is not None and ((configs['reassign'] and (batch_idx+1) % configs['reassign_freq'] == 0) or c): #TT
-            P_costs=ADMM.update_assignment()
+                
+            if ADMM is not None and configs['reassign']: #TT
+                #print("#### Re assign")
+                P_costs=ADMM.update_assignment()
 
 
 
@@ -124,6 +125,9 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
                     )
 
         pbar.set_description(msg)
+    # TT
+    # Debugging
+    #ADMM.ppp()
     #print('Training time per epoch is {:.2f}s.'.format(time.time()-start_time))
     metrics = {
         'batch_loss': batch_loss,

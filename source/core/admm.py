@@ -74,6 +74,11 @@ class ADMM:
 
         print("!!!! ADMM runs with: ", self.approach, self.penalty, self.sparsity_type)
 
+    def ppp(self):
+        print("#### debugging! ")
+        name = self.layers[3]
+        print(self.P[name])
+        print(self.Y[name])
 
 
     def return_assignment(self,hard=True):
