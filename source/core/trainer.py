@@ -24,19 +24,21 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
     
     if ADMM is not None: 
         ADMM.Z_update(configs, model)
+        ADMM.W_update_old()
 
     
     start_time = time.time()
     n_data = configs['batch_size'] * len(data_loader)
     pbar = tqdm(enumerate(data_loader), total=n_data/configs['batch_size'], ncols=150)
+    
     for batch_idx, batch in pbar:
         #print("!!!!!!!!!!! BATCH IDX: ", batch_idx)
         # TT
         # Run for smaller dataset
-        
+        #'''
         if batch_idx > 20:
             break
-        
+        #'''
         data   = ()
         for piece in batch[:-1]:
             data += (piece.float().to(configs['device']),)
@@ -94,6 +96,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         else:
             scheduler.step()
         c=False  # TT
+        
         if (cepoch != 1 and batch_idx == 0 and (cepoch-1) % configs['theta_epochs'] == 0) or c:
             if ADMM is not None:
                 print("\n!!!!!! Running Updates for ", cepoch, batch_idx)

@@ -86,6 +86,37 @@ def create_partition(configs, model):
     else:
         raise Exception("num_partition must be an integer to initialize partition")
 
+def save_partition_new(configs, epoch=0, save_path=None):
+    class MyDumper(yaml.SafeDumper):
+        def increase_indent(self, flow=False, indentless=False):
+            return super(MyDumper, self).increase_indent(flow=flow, indentless=indentless)
+
+    def represent_list(dumper, data):
+        return dumper.represent_sequence('tag:yaml.org,2002:seq', data, flow_style=True)
+    
+    MyDumper.add_representer(list, represent_list)
+    
+    partition_copy = copy.deepcopy({k: v.tolist() for k, v in configs['new_P'].items()})
+    
+    # Convert filter_id lists of lists into standard lists
+    for layer in partition_copy:
+        if isinstance(partition_copy[layer], dict) and 'filter_id' in partition_copy[layer]:
+            partition_copy[layer]['filter_id'] = [sublist.tolist() for sublist in partition_copy[layer]['filter_id'] if isinstance(sublist, np.ndarray)]
+        if isinstance(partition_copy[layer], dict) and 'budget' in partition_copy[layer] and isinstance(partition_copy[layer]['budget'], np.ndarray):
+            partition_copy[layer]['budget'] = partition_copy[layer]['budget'].tolist()
+        if isinstance(partition_copy[layer], np.ndarray):
+            partition_copy[layer] = partition_copy[layer].tolist()
+            
+    
+    if save_path is None:
+        save_path = re.sub(r'\.ya?ml$', '', configs['partition_path'])
+        save_path = save_path + f'_{epoch}.yaml'
+    
+    with open(save_path, "w") as stream:
+        yaml.dump(partition_copy, stream, Dumper=MyDumper, default_flow_style=False)
+    
+    print(f"Partition saved to {save_path}")
+
 def save_partition(configs, epoch=0, save_path=None):
     class MyDumper(yaml.SafeDumper):
         def increase_indent(self, flow=False, indentless=False):

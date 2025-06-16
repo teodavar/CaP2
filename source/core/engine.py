@@ -151,8 +151,8 @@ class MoP:
                     #print("!!!!! new P: ", self.configs["new_P"][initadmm.layers[3]])
                     #print("!!!!! new W: ", initadmm.W[initadmm.layers[3]])
                     #print("!!!!! ADMM.getE(initadmm.W[initadmm.layers[3]]):", initadmm.getE(initadmm.W[initadmm.layers[3]]))
-                    comm_cost=comunication_penalty1(self.model,initadmm,self.configs,self.configs["new_P"])
-                    comm_cost2,l =comunication_penalty2(self.model,initadmm,self.configs,self.configs["new_P"],dif=False, ret=True)
+                    comm_cost=comunication_penalty1(self.model,admm,self.configs,self.configs["new_P"])
+                    comm_cost2,l =comunication_penalty2(self.model,admm,self.configs,self.configs["new_P"],dif=True, ret=True)
 
                     #print("!!!! comm_cost2=",comm_cost2, l)
                     
@@ -199,13 +199,12 @@ class MoP:
                 raise  # Re-raise the error after printing for visibility
             
             # hard prune
-            if self.configs['prune_ratio'] != 0:
-                hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
-            self.configs['comm_costs'] = set_communication_cost(self.model, self.configs['partition'],)
-            if self.configs['prune_ratio'] == 0 and self.configs['reassign']:
-                P_cost = update_assignments(self.model, self.configs, use_wandb=False)
-                    
-            save_partition(self.configs, cepoch, os.path.join(experiment_dir, "partition_final"))  # Save last partition state
+            admm.finaliseW()
+            eval_cost,eval_cost_aggregate=evaluate_comm(self.model,admm,self.configs,self.configs["new_P"])
+            if self.configs.get('use_wandb', False):
+                wandb.log({"eval_cost": eval_cost})
+                wandb.log({"eval_cost_aggregate": eval_cost_aggregate})
+            save_partition_new(self.configs, cepoch, os.path.join(experiment_dir, "partition_final"))  # Save last partition state
             if self.configs.get('use_wandb', False):
                 artifact = wandb.Artifact(name="final_partition", type="config")
                 artifact.add_file(os.path.join(experiment_dir, f"partition_final"))

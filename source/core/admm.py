@@ -101,12 +101,12 @@ class ADMM:
         convergence_Z = sum(torch.norm(self.ADMM_Z[name] - self.prev_Z[name]) for name in self.layers)
         convergence_P = sum(torch.norm(self.P[name] - self.prev_P[name]) for name in self.layers)
         convergence_Y = sum(torch.norm(self.Y[name] - self.prev_Y[name]) for name in self.layers)
-        self.prev_W=copy.deepcopy(self.W)
-        self.prev_Z=copy.deepcopy(self.ADMM_Z)
-        self.prev_Y=copy.deepcopy(self.Y)
-        self.prev_P=copy.deepcopy(self.P)
         #print("!!!! Convergence values: ", convergence_W,convergence_Z,convergence_P, convergence_Y)
         return convergence_W,convergence_Z,convergence_P,convergence_Y
+
+    def W_update_old(self):
+        self.prev_W=copy.deepcopy(self.W)
+
 
     def init_assignment(self,hard=False):
         P={}
@@ -179,6 +179,7 @@ class ADMM:
                writer=False,
                cross_x=4,
                cross_f=1):
+        self.prev_Z=copy.deepcopy(self.ADMM_Z)
         #print("Z update")
         admm_epochs, sparsity_type = config_dict['admm_epochs'],self.sparsity_type 
         for i, (name, W) in enumerate(model.named_parameters()):
@@ -189,7 +190,7 @@ class ADMM:
             
             self.ADMM_Z[name] = W.detach() + self.ADMM_U[name].detach()  # Z(k+1) = W(k+1)+U[k]
 
-            self.WP(name, sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
+            self.ADMM_Z[name]=self.WP(self.ADMM_Z[name],name, sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
             
             self.ADMM_U[name] = W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
     
@@ -207,10 +208,10 @@ class ADMM:
                 continue
             self.ADMM_U[name] = W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
 
-    def WP(self,name, sparsity_type, cross_x=4, cross_f=1):
+    def WP(self,weight,name, sparsity_type, cross_x=4, cross_f=1):
         prune_ratio=self.prune_ratios[name]
         partition=self.partition
-        weight = self.ADMM_Z[name].detach()
+        weight = weight.detach()
         device = weight.device
         percent = prune_ratio * 100
         if len(weight.shape)==2:
@@ -280,11 +281,12 @@ class ADMM:
     def getE(self,W):
         return torch.norm(W, dim=(2, 3))
     def update_assignment(self):
+        self.prev_P=copy.deepcopy(self.P)
         P_costs=[]
         if self.approach=="original":
             #print("timing P")
             start=time.time()
-            solve_original_assignment(self) 
+            solve_original_assignment(self,dif=True) 
             #print(time.time()-start)
             P_costs.append(self.comunication_penalty().item()) # TT
         elif self.approach=="relaxed":
@@ -304,7 +306,7 @@ class ADMM:
             P_costs.append(self.comunication_penalty(hard=True).item()) #TT
         return P_costs
 
-    def linear_cost_matrix(self,name):
+    def linear_cost_matrix(self,name,dif=False):
         if self.approach=="original":
             Ps=self.P
         parents = self.partition[name].get('parents', [])
@@ -321,13 +323,25 @@ class ADMM:
             needs=E@P
         elif self.penalty=="aggregate_partition_rows":
             needs=E@P
-            needs=needs[needs!=0]=1
+            #print("@@@@@@@ needs: ", needs)
+            if dif==False:
+                needs[needs!=0]=1
+            else:
+                t=1
+                needs=torch.tanh(t*needs)
         Cl=needs @ self.C
 
         #print(E.shape,P.shape,self.C.shape,Cl.shape)
         return Cl
         #if cost type is 2
-        
+    def finaliseW(self):
+        model=self.model
+        for (name, W) in model.named_parameters():
+            if name not in self.prune_ratios:  # ignore layers that do not have rho
+                continue
+            W.data = self.ADMM_Z[name]
+
+
                
 #########################################################################
 #########################################################################
