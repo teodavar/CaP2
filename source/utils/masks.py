@@ -96,7 +96,9 @@ def save_partition_new(configs, epoch=0, save_path=None):
     
     MyDumper.add_representer(list, represent_list)
     
-    partition_copy = copy.deepcopy({k: v.tolist() for k, v in configs['new_P'].items()})
+    partition_temp = copy.deepcopy({k: v.tolist() for k, v in configs['new_P'].items()})
+    partition_copy = copy.deepcopy({k: v for k, v in configs['partition'].items() if k != 'model_graph'})
+    partition_copy['new_P'] = partition_temp
     
     # Convert filter_id lists of lists into standard lists
     for layer in partition_copy:

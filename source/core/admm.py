@@ -27,6 +27,18 @@ def translate_to_tensor(L):
             tensor[n,m]=1
     return tensor.to(device='cuda')
 
+def new_to_old_partition(newP):
+    m=newP.shape[1]
+    L=[]
+    i=newP.nonzero()
+    for j in range(m):
+        l=i[i[:,1]==j][:,0].tolist()
+        #print(l)
+        L.append(np.array(l).astype(int))
+    #print(L)
+    return L
+
+
 class ADMM:
     def __init__(self, config_dict, model, rho=0.001, target='weight',approach="original",penalty="full"):
         self.approach=config_dict['approach'] # "original", "relaxed"
@@ -61,8 +73,12 @@ class ADMM:
                 lsize+=len(a)
             self.layer_info[l]= {k: v for k, v in self.partition[l].items() if k != "filter_id"} 
             self.layer_info[l]["layer_size"]=lsize
-        self.P=self.init_assignment(False)
+        if self.approach=="original":
+            self.P=self.init_assignment(True)
+        else:
+            self.P=self.init_assignment(False)
         self.Y=self.init_assignment(True)
+        #test_assignment(self.Y,"failed init")
         self.V=self.zero_assignment()
         self.layers=[]
         self.W={}
@@ -73,6 +89,18 @@ class ADMM:
         self.init_convergence()
 
         print("!!!! ADMM runs with: ", self.approach, self.penalty, self.sparsity_type)
+    def update_partition(self,newP):
+        #print("PPPPPPPPPPPPPPPPPPPPPPPP")
+        #print(self.config['partition'].keys())
+        for l in self.layer_names:
+            #print("LLLLLLLLLLLLLLLLLLLLLLLL")
+            #print(self.partition[l]['filter_id'])
+            #print(self.config["new_P"][l])
+            self.partition[l]['filter_id']=new_to_old_partition(newP[l])
+            #print(self.partition[l]['filter_id'])
+        #print(self.config['partition'].keys())
+
+
 
     def ppp(self):
         print("#### debugging! ")
@@ -80,12 +108,45 @@ class ADMM:
         print(self.P[name])
         print(self.Y[name])
 
+    def getW(self,model):
+        Weights={}
+        for (name, W) in model.named_parameters():
+            if name in admm.prune_ratios:
+                Weights[name]=W
+        return Weights
 
+    def test_prunning(self,Ws,Ps,s="mmmmm"):
+        test=False
+        zeros=0
+        total=0
+        zerosp=0
+        totalp=0
+        print(s)
+        for (name,W) in Ws.items():
+            #simple
+            E=self.getE(W)
+            E[E!=0]=1
+            (n1,n2)=E.shape
+            total=n1*n2
+            zeros=total-E.sum()
+            print(name,total,zeros,zeros/total)
+            #lin alg
+            P=self.getPin(name,Ps)
+            needs=E@P
+            needs[needs!=0]=1
+            (n,m)=needs.shape
+            totalp=n*m
+            zerosp=totalp-needs.sum()
+            print(name,totalp,zerosp,zerosp/totalp)
+            print(self.prune_ratios[name])
+    
     def return_assignment(self,hard=True):
         if self.approach=="original":
             return self.P
         elif self.approach=="relaxed":
-            return self.Y if hard else self.P
+            if hard:
+                return self.Y          
+            return self.P
     def init_convergence(self):
         self.prev_W=copy.deepcopy(self.W)
         self.prev_Z=copy.deepcopy(self.ADMM_Z)
@@ -188,12 +249,13 @@ class ADMM:
             if config_dict['multi_rho']:
                 admm_multi_rho_scheduler(self,name) # call multi rho scheduler every admm update
             
-            self.ADMM_Z[name] = W.detach() + self.ADMM_U[name].detach()  # Z(k+1) = W(k+1)+U[k]
+            self.ADMM_Z[name]=torch.zeros(W.shape).to(self.device)
 
-            self.ADMM_Z[name]=self.WP(self.ADMM_Z[name],name, sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
+            self.ADMM_Z[name] += W.detach() + self.ADMM_U[name].detach()  # Z(k+1) = W(k+1)+U[k]
+
+            self.ADMM_Z[name]=self.WP(self.ADMM_Z[name],name,self.return_assignment(hard=True), sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
             
-            self.ADMM_U[name] = W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
-    
+            
     
     def U_update(self,config_dict,
                model,
@@ -206,9 +268,18 @@ class ADMM:
         for i, (name, W) in enumerate(model.named_parameters()):
             if name not in self.prune_ratios:
                 continue
-            self.ADMM_U[name] = W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
+            self.ADMM_U[name] = torch.zeros(W.shape).to(self.device)
+            self.ADMM_U[name] += W.detach() - self.ADMM_Z[name].detach() + self.ADMM_U[name].detach()  # U(k+1) = W(k+1) - Z(k+1) +U(k)
 
-    def WP(self,weight,name, sparsity_type, cross_x=4, cross_f=1):
+    def getPin(self,name,Ps):
+        parents = self.partition[name].get('parents', [])
+        P=copy.deepcopy(Ps[parents[0]])
+        for i in range(1,len(parents)):
+            P+=Ps[parents[i]]
+        P[P!=0]=1
+        return P
+
+    def WP(self,weight,name,Ps, sparsity_type, cross_x=4, cross_f=1):
         prune_ratio=self.prune_ratios[name]
         partition=self.partition
         weight = weight.detach()
@@ -219,13 +290,13 @@ class ADMM:
         else:
             W= torch.norm(weight, dim=(2, 3))
         parents = partition[name].get('parents', [])
-        P=self.Y[parents[0]]
+        P=copy.deepcopy(Ps[parents[0]])
         
         for parent in parents: 
             if parent not in partition:
                 raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
         for i in range(1,len(parents)):
-            P+=self.Y[parents[i]]
+            P+=Ps[parents[i]]
         P[P!=0]=1
         
         if (sparsity_type == "irregular") :
@@ -246,12 +317,24 @@ class ADMM:
             needs=torch.sqrt(E@P)
             #W[W!=0]=1
             needs=W@P
-            Pout=self.Y[name]
-            c2=Pout*(1e+10)
-            res1=needs+c2
-            t=torch.quantile(res1, prune_ratio) 
-            res1[res1<t]=0
-            res1[res1!=0]=1
+            Pout=Ps[name]
+
+            
+            #adjust semantics pr is ratio of pruned to total
+            total=needs.shape[0]*needs.shape[1]
+            keep=(1-prune_ratio)*total
+            aligned_keep=needs.shape[0]
+            misaligned_keep=keep-aligned_keep
+            misaligned_total=total-aligned_keep
+            apr=misaligned_keep/total
+
+            c2=1-Pout
+            res1=needs*c2
+            t=torch.quantile(res1, 1-apr) 
+            res1[res1>t]=1
+            res1[res1!=1]=0
+            res1=res1+Pout
+
             mask=res1@torch.transpose(P,0,1)
             mask[mask!=0]=1
             if len(weight.shape)==2:
@@ -315,7 +398,7 @@ class ADMM:
         
         if len(parents)==0:
             raise ValueError(f"no parents")
-        P=Ps[parents[0]]
+        P=copy.deepcopy(Ps[parents[0]])
         for i in range(1,len(parents)):
             P+=Ps[parents[i]]
         #print(E.device,P.device,self.C.device)

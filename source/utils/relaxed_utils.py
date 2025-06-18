@@ -36,6 +36,71 @@ def Y_update(model,ADMM,configs):
             ADMM.Y[name]=torch.from_numpy(Y).float().to(ADMM.device)
             #print(ADMM.ADMM_Y.P[name])
             #sys.exit()
+    #test_assignment(ADMM.Y,s="failed hard assignment")
+
+def test_assignment(P,s="?"):
+    test=False
+    for (k,v) in P.items():
+        (n,m)=v.shape
+        for i in range(n):
+            sum=0
+            for j in range(m):
+                sum+=v[i,j]
+                if v[i,j]!=0 and v[i,j]!=1:
+                    print(v[i,:],i)
+                    test=True
+            if sum!=1:
+                print(v[i,:],i)
+                test=True
+    if test:
+        print(s)
+        print(k,v)
+        sys.exit()
+def getE(W):
+    return torch.norm(W, dim=(2, 3))
+def test_prunning(model,Ps,admm,s="mmmmm"):
+    test=False
+    
+    print(s)
+    for (name, W) in model.named_parameters():
+        if name in admm.prune_ratios:
+            #simple
+            zeros=0
+            total=0
+            zerosp=0
+            totalp=0
+            E=admm.getE(W)
+            E[E!=0]=1
+            (n1,n2)=E.shape
+            '''
+            for i in range(n1):
+                for j in range(n2):
+                    total+=1
+                    if E[i,j]==0:
+                        zeros+=1
+            '''
+            total=n1*n2
+            zeros=total-E.sum()
+            print(name,total,zeros,zeros/total)
+            #lin alg
+            P=admm.getPin(name,Ps)
+            needs=E@P
+            needs[needs!=0]=1
+            (n,m)=needs.shape
+            '''
+            for i in range(n):
+                for j in range(m):
+                    totalp+=1
+                    if needs[i,j]==0:
+                        zerosp+=1
+            '''
+            totalp=n*m
+            zerosp=totalp-needs.sum()
+            print(name,totalp,zerosp,zerosp/totalp)
+            print(admm.prune_ratios[name])
+
+
+
 
 def V_update(model,ADMM,configs):
     for (name, W) in model.named_parameters():

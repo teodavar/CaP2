@@ -35,10 +35,10 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         #print("!!!!!!!!!!! BATCH IDX: ", batch_idx)
         # TT
         # Run for smaller dataset
-        #'''
-        if batch_idx > 20:
+        control=True
+        if batch_idx > 20 and control:
             break
-        #'''
+        
         data   = ()
         for piece in batch[:-1]:
             data += (piece.float().to(configs['device']),)
@@ -101,6 +101,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
             if ADMM is not None:
                 print("\n!!!!!! Running Updates for ", cepoch, batch_idx)
                 ADMM.Z_update(configs, model)
+                ADMM.test_prunning(ADMM.ADMM_Z,ADMM.return_assignment(hard=True),s='z update failed at: '+str(cepoch))
                 ADMM.U_update(configs, model)
                 
             if ADMM is not None and configs['reassign']: #TT
