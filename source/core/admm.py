@@ -137,7 +137,8 @@ class ADMM:
             (n,m)=needs.shape
             totalp=n*m
             zerosp=totalp-needs.sum()
-            print(name,totalp,zerosp,zerosp/totalp)
+            print("zxcv",name,totalp,zerosp,zerosp/totalp)
+            print(name,(totalp-n),(zerosp-n),(zerosp-n)/(totalp-n))
             print(self.prune_ratios[name])
     
     def return_assignment(self,hard=True):
@@ -312,6 +313,58 @@ class ADMM:
             )  # has to convert bool to float32 for numpy-tensor conversion
             weight[under_threshold] = 0
             return torch.from_numpy(above_threshold).to(device), torch.from_numpy(weight).to(device)
+        elif (sparsity_type == 'kernel'):
+            weight = weight.cpu().detach().numpy()
+            shape = weight.shape
+            weight3d = weight.reshape(shape[0], shape[1], -1)
+            shape3d = weight3d.shape
+            if len(shape3d) == 2:
+                weight3d = weight3d[:,:,None]
+            kernel_l2_norm = LA.norm(weight3d, 2, axis=2)
+            percentile = np.percentile(kernel_l2_norm, percent)
+            under_threshold = kernel_l2_norm <= percentile
+            above_threshold = kernel_l2_norm > percentile
+            weight3d[under_threshold, :] = 0
+            
+            weight = weight3d.reshape(shape)
+            return above_threshold, torch.from_numpy(weight).to(device)
+        elif (sparsity_type == "column"):
+            weight = weight.cpu().detach().numpy()
+            shape = weight.shape
+            weight2d = weight.reshape(shape[0], -1)
+            shape2d = weight2d.shape
+            column_l2_norm = LA.norm(weight2d, 2, axis=0)
+            percentile = np.percentile(column_l2_norm, percent)
+            under_threshold = column_l2_norm < percentile
+            above_threshold = column_l2_norm > percentile
+            weight2d[:, under_threshold] = 0
+            above_threshold = above_threshold.astype(np.float32)
+            expand_above_threshold = np.zeros(shape2d, dtype=np.float32)
+            for i in range(shape2d[1]):
+                expand_above_threshold[:, i] = above_threshold[i]
+            expand_above_threshold = expand_above_threshold.reshape(shape)
+            weight = weight.reshape(shape)
+            return torch.from_numpy(
+                expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
+    
+        elif (sparsity_type == "row"):
+            weight = weight.cpu().detach().numpy()
+            shape = weight.shape
+            weight2d = weight.reshape(shape[0], -1)
+            shape2d = weight2d.shape
+            row_l2_norm = LA.norm(weight2d, 2, axis=1)  # Compute L2 norms for rows
+            percentile = np.percentile(row_l2_norm, percent)
+            under_threshold = row_l2_norm < percentile
+            above_threshold = row_l2_norm > percentile
+            weight2d[under_threshold, :] = 0  # Set rows below the threshold to zero
+            above_threshold = above_threshold.astype(np.float32)
+            expand_above_threshold = np.zeros(shape2d, dtype=np.float32)
+            for i in range(shape2d[0]):
+                expand_above_threshold[i, :] = above_threshold[i]
+            expand_above_threshold = expand_above_threshold.reshape(shape)
+            weight = weight.reshape(shape)
+            return torch.from_numpy(
+                expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
         elif sparsity_type == "partition_row" :
             E=W**2
             needs=torch.sqrt(E@P)
@@ -322,14 +375,15 @@ class ADMM:
             
             #adjust semantics pr is ratio of pruned to total
             total=needs.shape[0]*needs.shape[1]
-            keep=(1-prune_ratio)*total
             aligned_keep=needs.shape[0]
-            misaligned_keep=keep-aligned_keep
             misaligned_total=total-aligned_keep
-            apr=misaligned_keep/total
 
+            misaligned_keep=(1-prune_ratio)*misaligned_total            
+            apr=misaligned_keep/total
+            
             c2=1-Pout
             res1=needs*c2
+            
             t=torch.quantile(res1, 1-apr) 
             res1[res1>t]=1
             res1[res1!=1]=0
@@ -419,6 +473,7 @@ class ADMM:
         #if cost type is 2
     def finaliseW(self):
         model=self.model
+        self.Z_update(self.config, model)
         for (name, W) in model.named_parameters():
             if name not in self.prune_ratios:  # ignore layers that do not have rho
                 continue

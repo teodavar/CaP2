@@ -148,8 +148,8 @@ class MoP:
                     # Compute Communication Cost Reduction
                     #comm_cost = compute_comm_cost(self.model, self.configs['partition'])
                     self.configs["new_P"]=admm.return_assignment(hard=True)
-                    test_prunning(self.model,self.configs["new_P"],admm,s="mmm")
-                    test_assignment(self.configs["new_P"],"failed update at epoch: "+str(cepoch))
+                    #test_prunning(self.model,self.configs["new_P"],admm,s="mmm")
+                    #test_assignment(self.configs["new_P"],"failed update at epoch: "+str(cepoch))
                     #print("!!!!! new P: ", self.configs["new_P"][initadmm.layers[3]])
                     #print("!!!!! new W: ", initadmm.W[initadmm.layers[3]])
                     #print("!!!!! ADMM.getE(initadmm.W[initadmm.layers[3]]):", initadmm.getE(initadmm.W[initadmm.layers[3]]))
@@ -201,15 +201,16 @@ class MoP:
                 raise  # Re-raise the error after printing for visibility
             
             # hard prune
+            
             admm.finaliseW()
-            test_prunning(self.model,self.configs["new_P"],admm,s="iii")
+            #test_prunning(self.model,self.configs["new_P"],admm,s="iii")
             agreement_W,agreement_P=admm.agreement()
             print("agreements ", agreement_W, sum(torch.norm(self.configs["new_P"][name] - admm.Y[name]) for name in admm.layers))
             eval_cost,eval_cost_aggregate=evaluate_comm(self.model,admm,self.configs,self.configs["new_P"])
             if self.configs.get('use_wandb', False):
                 wandb.log({"eval_cost": eval_cost})
                 wandb.log({"eval_cost_aggregate": eval_cost_aggregate})
-            test_prunning(self.model,self.configs["new_P"],admm,s="ui")
+            #test_prunning(self.model,self.configs["new_P"],admm,s="ui")
             admm.update_partition(self.configs["new_P"])
             save_partition_new(self.configs, cepoch, os.path.join(experiment_dir, "partition_final"))  # Save last partition state
             if self.configs.get('use_wandb', False):

@@ -10,5 +10,5 @@ __pycache__/
 .vscode
 /colosseum/*.json
 /colosseum/*.txt
-/experiment_logs/*.*
+/experiment_logs*/*.*
 /wandb/
