@@ -223,7 +223,9 @@ class ADMM:
             if name not in self.prune_ratios:
                 continue
 
+            print(type(W), type(self.ADMM_Z[name]))
             admm_loss[name] = 0.5 * self.rhos[name] * (torch.norm(W - self.ADMM_Z[name] + self.ADMM_U[name], p=2)**2)
+            
             #print(name, admm_loss[name], ADMM.rhos[name])
             #print(name, torch.norm(W - ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2)**2)
             # admm_loss[name] = 0.5 * ADMM.rhos[name] * (torch.norm(ADMM.ADMM_Z[name] + ADMM.ADMM_U[name], p=2) ** 2)  # test if Z,U are net detached
@@ -312,7 +314,8 @@ class ADMM:
                 np.float32
             )  # has to convert bool to float32 for numpy-tensor conversion
             weight[under_threshold] = 0
-            return torch.from_numpy(above_threshold).to(device), torch.from_numpy(weight).to(device)
+            #return torch.from_numpy(above_threshold).to(device), torch.from_numpy(weight).to(device)
+            return torch.from_numpy(weight).to(device)
         elif (sparsity_type == 'kernel'):
             weight = weight.cpu().detach().numpy()
             shape = weight.shape
@@ -327,7 +330,8 @@ class ADMM:
             weight3d[under_threshold, :] = 0
             
             weight = weight3d.reshape(shape)
-            return above_threshold, torch.from_numpy(weight).to(device)
+            #return above_threshold, torch.from_numpy(weight).to(device)
+            return torch.from_numpy(weight).to(device)
         elif (sparsity_type == "column"):
             weight = weight.cpu().detach().numpy()
             shape = weight.shape
@@ -344,8 +348,9 @@ class ADMM:
                 expand_above_threshold[:, i] = above_threshold[i]
             expand_above_threshold = expand_above_threshold.reshape(shape)
             weight = weight.reshape(shape)
-            return torch.from_numpy(
-                expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
+            #return torch.from_numpy(
+            #    expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
+            return torch.from_numpy(weight).to(device)
     
         elif (sparsity_type == "row"):
             weight = weight.cpu().detach().numpy()
@@ -363,8 +368,10 @@ class ADMM:
                 expand_above_threshold[i, :] = above_threshold[i]
             expand_above_threshold = expand_above_threshold.reshape(shape)
             weight = weight.reshape(shape)
-            return torch.from_numpy(
-                expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
+            #return torch.from_numpy(
+            #    expand_above_threshold).to(device), torch.from_numpy(weight).to(device)
+            return torch.from_numpy(weight).to(device)
+
         elif sparsity_type == "partition_row" :
             E=W**2
             needs=torch.sqrt(E@P)
