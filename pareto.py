@@ -488,19 +488,19 @@ def plot_table_metrics(table_experiments, output_dir="."):
 
     for key, reassignments in table_experiments.items():
         key_string = key[0] + "_" + (key[1])
-        print("KEYYYYY: ", key_string)
+        #print("KEYYYYY: ", key_string)
         partition = key[2]
         penalty = key[3]
-        print(partition, penalty)
+        #print(partition, penalty)
         for idx, (reassign_flag, runs) in enumerate(reassignments.items()):
-            print(reassign_flag)
+            #print(reassign_flag)
             first_split = reassign_flag.split("-")
             admm_epochs = first_split[1]
             second_split = reassign_flag.split("_")
             topology = second_split[2]
             for run in runs:
                 #print("-----------------")
-                print(run)
+                #print(run)
                 partitions.append(partition)
                 penalties.append(penalty)
                 exp_runs.append(reassign_flag)
@@ -951,7 +951,7 @@ def generate_visualizations(experiment_logs, code, dataset_root, gen_images=Fals
         if eval_cost_aggregate is None:
             print(f"SKIPPING FOR FOLDER: {folder}, eval_cost_aggregate")
             continue
-        print("accuracy, comm_cost, eval_cost, eval_cost_aggregate: ", accuracy, comm_cost, eval_cost, eval_cost_aggregate)    
+        #print("accuracy, comm_cost, eval_cost, eval_cost_aggregate: ", accuracy, comm_cost, eval_cost, eval_cost_aggregate)    
         model_spar_kernel = compute_model_sparsity(model, partition_data, mode="kernel")
         #model_spar_pr = compute_model_sparsity(model, partition_data, mode="partition_row")  
         

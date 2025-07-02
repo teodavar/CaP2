@@ -221,7 +221,7 @@ def generate_partition(configs, model):
             #print("!!!! W.shape[0]: ", W.shape[0])
             #print("!!!! num_partitions: ", num_partitions)
             #print("!!!! budgets[idx]: ", budgets[idx])
-            print("!!!! Calling get_partition_from_code 2")
+            #print("!!!! Calling get_partition_from_code 2")
             filter_id = get_partition_from_code(configs['data_code'], W.shape[0], num_partitions, budgets[idx])
             
             if name not in add_node_pairs_map:
@@ -246,8 +246,8 @@ def generate_partition(configs, model):
             print(f"Partition information of {name}:\n", partition[name])
                 
     # Ensure inputs node is included
-    print("!!!! input_shape: ", input_shape, " num_partitions: ", num_partitions, " input_part: ", input_part)
-    print("!!!! Calling get_partition_from_code 1")
+    #print("!!!! input_shape: ", input_shape, " num_partitions: ", num_partitions, " input_part: ", input_part)
+    #print("!!!! Calling get_partition_from_code 1")
     partition['inputs'] = {'filter_id': 
                            get_partition_from_code(configs['data_code'], input_shape, num_partitions, input_part),
                            'input_partition': input_part.tolist()} 
@@ -306,11 +306,11 @@ def get_partition_from_code(dataset, shape, num_partitions, budget, random_assig
         np.random.shuffle(p_range)
 
     # Compute the absolute filter allocation per partition with rounding
-    print("!!!! budget: ", budget)
+    #print("!!!! budget: ", budget)
     absolute_counts = np.round(np.array(budget) * shape).astype(int)
-    print("!!!! absolute_counts 1: ", absolute_counts)
+    #print("!!!! absolute_counts 1: ", absolute_counts)
     fixsum(absolute_counts,shape)
-    print("!!!! absolute_counts --- after fixsum: ", absolute_counts)
+    #print("!!!! absolute_counts --- after fixsum: ", absolute_counts)
 
 
     # Adjust for any rounding mismatches
@@ -319,31 +319,27 @@ def get_partition_from_code(dataset, shape, num_partitions, budget, random_assig
     while absolute_counts.sum() > shape:
         absolute_counts[np.argmin(budget)] -= 1
 
-    print("!!!! absolute_counts 2: ", absolute_counts)
+    #print("!!!! absolute_counts 2: ", absolute_counts)
     # Assign filters to each partition
     p_id = []
     yy = []
     start = 0
     for count in absolute_counts:
         subset = p_range[start : start + count]
-        print("!!!! start, count, subset: ", start, count, subset)
+        #print("!!!! start, count, subset: ", start, count, subset)
         # Sort each subset in ascending order to keep partition indices sorted
         subset_sorted = np.sort(subset)
-        print("!!!! subset_sorted: ", subset_sorted)
+        #print("!!!! subset_sorted: ", subset_sorted)
         p_id.append(subset_sorted)
         yy.append(subset_sorted)
         start += count
-    print("!!!! shape, p_id: ", len(p_id), p_id)
-    print("!!!! shape, yy: ", len(yy), yy)
+    #print("!!!! shape, p_id: ", len(p_id), p_id)
+    #print("!!!! shape, yy: ", len(yy), yy)
     # Final sanity check: ensure all filters are assigned
-    xx = 0
-    for part in p_id:
-        print("!!!!! len, part: ", len(part), part)
-        xx = xx + len(part)
-    print("!!!! xx: ", xx)
+
     assigned_channels = sum(len(part) for part in p_id)
-    print("!!!! assigned_channels: ", assigned_channels)
-    print("!!!! shape: ", shape)
+    #print("!!!! assigned_channels: ", assigned_channels)
+    #print("!!!! shape: ", shape)
     if assigned_channels != shape:
         raise ValueError(f"Partitioning failed: {assigned_channels} filters assigned, but expected {shape}.")
 
