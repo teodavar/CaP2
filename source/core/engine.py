@@ -206,7 +206,10 @@ class MoP:
             #test_prunning(self.model,self.configs["new_P"],admm,s="iii")
             agreement_W,agreement_P=admm.agreement()
             print("agreements ", agreement_W, sum(torch.norm(self.configs["new_P"][name] - admm.Y[name]) for name in admm.layers))
-            eval_cost,eval_cost_aggregate=evaluate_comm(self.model,admm,self.configs,self.configs["new_P"])
+            #eval_cost,eval_cost_aggregate=evaluate_comm(self.model,admm,self.configs,self.configs["new_P"])
+            eval_cost,eval_cost_aggregate=evaluate_comm(self.model,self.configs,self.configs["new_P"])
+            self.configs["eval_cost"] = eval_cost
+            self.configs["eval_cost_aggregate"] = eval_cost_aggregate
             if self.configs.get('use_wandb', False):
                 wandb.log({"eval_cost": eval_cost})
                 wandb.log({"eval_cost_aggregate": eval_cost_aggregate})
@@ -293,8 +296,11 @@ class MoP:
             
             # Save best accuracy in a text file
             best_acc_path = os.path.join(self.configs['experiment_dir'], 'best_accuracy.txt')
+            eval_cost,eval_cost_aggregate=evaluate_comm(self.model,self.configs,self.configs["new_P"])
             with open(best_acc_path, 'w') as f:
                 f.write(f"Best Fine-Tuned Accuracy: {best:.4f}%\n")
+                f.write(f"Best Fine-Tuned eval_cost: {eval_cost}\n")
+                f.write(f"Best Fine-Tuned eval_cost_aggregate: {eval_cost_aggregate}\n")
             
             if self.configs.get('use_wandb', False):
                 wandb.log({"best_acc": best})

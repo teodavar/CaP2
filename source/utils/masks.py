@@ -181,6 +181,7 @@ def load_partition(configs, model):
     return configs
 
 def generate_partition(configs, model):
+    #print("!!!!! partition_path: ", configs['partition_path'])
     with open(configs['partition_path'], "r") as stream:
         raw_dict = yaml.safe_load(stream)
     
@@ -217,6 +218,10 @@ def generate_partition(configs, model):
     for idx, name in enumerate(layers[1:]):
         if name in model.state_dict():
             W = model.state_dict()[name]
+            #print("!!!! W.shape[0]: ", W.shape[0])
+            #print("!!!! num_partitions: ", num_partitions)
+            #print("!!!! budgets[idx]: ", budgets[idx])
+            print("!!!! Calling get_partition_from_code 2")
             filter_id = get_partition_from_code(configs['data_code'], W.shape[0], num_partitions, budgets[idx])
             
             if name not in add_node_pairs_map:
@@ -241,6 +246,8 @@ def generate_partition(configs, model):
             print(f"Partition information of {name}:\n", partition[name])
                 
     # Ensure inputs node is included
+    print("!!!! input_shape: ", input_shape, " num_partitions: ", num_partitions, " input_part: ", input_part)
+    print("!!!! Calling get_partition_from_code 1")
     partition['inputs'] = {'filter_id': 
                            get_partition_from_code(configs['data_code'], input_shape, num_partitions, input_part),
                            'input_partition': input_part.tolist()} 
@@ -255,6 +262,18 @@ def generate_partition(configs, model):
     configs['partition'] = partition
     return configs
     
+def fixsum(a,shape):
+    total=np.sum(a)
+    dif=shape-total
+    d=np.sign(dif)
+    c=0
+    for i in range(a.size):
+        if c>=np.abs(dif):
+            break
+        if a[i]!=0:
+            a[i]+=d
+            c+=1
+    return a
 
 def get_partition_from_code(dataset, shape, num_partitions, budget, random_assign=False):
     """
@@ -287,7 +306,12 @@ def get_partition_from_code(dataset, shape, num_partitions, budget, random_assig
         np.random.shuffle(p_range)
 
     # Compute the absolute filter allocation per partition with rounding
+    print("!!!! budget: ", budget)
     absolute_counts = np.round(np.array(budget) * shape).astype(int)
+    print("!!!! absolute_counts 1: ", absolute_counts)
+    fixsum(absolute_counts,shape)
+    print("!!!! absolute_counts --- after fixsum: ", absolute_counts)
+
 
     # Adjust for any rounding mismatches
     while absolute_counts.sum() < shape:
@@ -295,18 +319,31 @@ def get_partition_from_code(dataset, shape, num_partitions, budget, random_assig
     while absolute_counts.sum() > shape:
         absolute_counts[np.argmin(budget)] -= 1
 
+    print("!!!! absolute_counts 2: ", absolute_counts)
     # Assign filters to each partition
     p_id = []
+    yy = []
     start = 0
     for count in absolute_counts:
         subset = p_range[start : start + count]
+        print("!!!! start, count, subset: ", start, count, subset)
         # Sort each subset in ascending order to keep partition indices sorted
         subset_sorted = np.sort(subset)
+        print("!!!! subset_sorted: ", subset_sorted)
         p_id.append(subset_sorted)
+        yy.append(subset_sorted)
         start += count
-
+    print("!!!! shape, p_id: ", len(p_id), p_id)
+    print("!!!! shape, yy: ", len(yy), yy)
     # Final sanity check: ensure all filters are assigned
+    xx = 0
+    for part in p_id:
+        print("!!!!! len, part: ", len(part), part)
+        xx = xx + len(part)
+    print("!!!! xx: ", xx)
     assigned_channels = sum(len(part) for part in p_id)
+    print("!!!! assigned_channels: ", assigned_channels)
+    print("!!!! shape: ", shape)
     if assigned_channels != shape:
         raise ValueError(f"Partitioning failed: {assigned_channels} filters assigned, but expected {shape}.")
 

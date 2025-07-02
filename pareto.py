@@ -9,6 +9,9 @@ from collections import defaultdict
 from source import models
 from PIL import Image, ImageColor, ImageDraw, ImageOps
 import random
+import pandas as pd
+from plottable import ColumnDefinition, Table
+
 from source.utils import dataset
 
 def parse_experiment_folder(folder_name):
@@ -33,6 +36,34 @@ def load_best_accuracy(folder_path):
     
     with open(best_acc_file, 'r') as f:
         match = re.search(r'Best Fine-Tuned Accuracy: ([0-9\.]+)%', f.read())
+        if match:
+            return float(match.group(1))
+    return None
+
+def load_new_comm_cost(folder_path):
+    """
+    Reads the best accuracy value from best_accuracy.txt.
+    """
+    best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
+    if not os.path.exists(best_acc_file):
+        return None
+    
+    with open(best_acc_file, 'r') as f:
+        match = re.search(r'Best Fine-Tuned eval_cost: ([0-9\.]+)', f.read())
+        if match:
+            return float(match.group(1))
+    return None
+
+def load_new_comm_cost2(folder_path):
+    """
+    Reads the best accuracy value from best_accuracy.txt.
+    """
+    best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
+    if not os.path.exists(best_acc_file):
+        return None
+    
+    with open(best_acc_file, 'r') as f:
+        match = re.search(r'Best Fine-Tuned eval_cost_aggregate: ([0-9\.]+)', f.read())
         if match:
             return float(match.group(1))
     return None
@@ -441,6 +472,162 @@ def extend_non_complete_runs(exp, runs_0):
                 rsgn = 'rsgn' if 'rsgn' in reassign_flag else 'fixed'
                 exp[key][reassign_flag].append(runs_0[key[3]][rsgn])
     return exp
+
+# Refer to https://github.com/znstrider/plottable/blob/master/docs/example_notebooks/wwc_example.ipynb
+def plot_table_metrics(table_experiments, output_dir="."):
+    topologies = []
+    penalties = []
+    partitions = []
+    exp_runs = []
+    prune_ratios = []
+    accuracies = []
+    comm_costs = []
+    eval_costs = []
+    eval_cost_aggregates = []
+    kernel_sparcities = []
+
+    for key, reassignments in table_experiments.items():
+        key_string = key[0] + "_" + (key[1])
+        print("KEYYYYY: ", key_string)
+        partition = key[2]
+        penalty = key[3]
+        print(partition, penalty)
+        for idx, (reassign_flag, runs) in enumerate(reassignments.items()):
+            print(reassign_flag)
+            first_split = reassign_flag.split("-")
+            admm_epochs = first_split[1]
+            second_split = reassign_flag.split("_")
+            topology = second_split[2]
+            for run in runs:
+                #print("-----------------")
+                print(run)
+                partitions.append(partition)
+                penalties.append(penalty)
+                exp_runs.append(reassign_flag)
+                prune_ratios.append(run[0])
+                accuracies.append(run[1])
+                comm_costs.append(run[2])
+                eval_costs.append(run[6])
+                eval_cost_aggregates.append(run[7])
+                kernel_sparcities.append(round(run[5],2))
+                topologies.append(topology)   
+    '''
+    print('Penalty: ', penalties)
+    print('Partitions: ', partitions)
+    print('Topology: ', topologies)
+    print('Run: ', exp_runs)
+    print('Prune Ratio: ', prune_ratios)
+    print('Accuracy: ', accuracies)
+    print('Kernel sparcity: ', kernel_sparcities)
+    print('Comm Cost: ', comm_costs)
+    print('Eval Cost: ', eval_costs)
+    print('Aggregate Cost:', eval_cost_aggregates)
+    '''
+
+    dict = {'Penalty': penalties, 'Partitions': partitions, 'Topology': topologies, 
+        'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Accuracy': accuracies, 'Kernel Sparcity': kernel_sparcities, 
+        'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates} 
+    
+    df = pd.DataFrame(dict)
+    df = df.set_index("Penalty")
+    #print(df)  
+
+    colnames = [
+        "Penalty",
+        "Partitions",
+        "Topology",
+        "Run",
+        "Prune Ratio",
+        "Accuracy",
+        "Comm Cost",
+        "Eval Cost",
+        "Aggregate Cost",
+        "Kernel Sparcity",
+    ]
+
+    col_defs = (
+    [
+        ColumnDefinition(
+            name="Penalty",
+            textprops={"ha": "left"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Partitions",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Topology",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Run",
+            textprops={"ha": "left"},
+            width=3,
+        ),
+        ColumnDefinition(
+            name="Prune Ratio",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Accuracy",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Comm Cost",
+            textprops={"ha": "left"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Aggregate Cost",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Eval Cost",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Kernel Sparcity",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+    ])
+
+    plt.rcParams["font.family"] = ["DejaVu Sans"]
+    plt.rcParams["savefig.bbox"] = "tight"
+
+    fig, ax = plt.subplots(figsize=(20, 12))
+    fig.suptitle(f"Table Metrics for {key_string}", fontsize=10, y=0.9)
+
+    table = Table(
+        df,
+        column_definitions=col_defs,
+        #row_dividers=True,
+        #footer_divider=True,
+        ax=ax,
+        textprops={"fontsize": 10},
+        #row_divider_kw={"linewidth": 0.5, "linestyle": (0, (1, 5))},
+        #col_label_divider_kw={"linewidth": 0.5, "linestyle": "-"},
+        #column_border_kw={"linewidth": 0.5, "linestyle": "-"},
+    )#.autoset_fontcolors(colnames=["OFF", "DEF"])
+
+    save_fname = os.path.join(
+            output_dir,
+            f"{key_string}_table_metrics.png"
+        )
+    fig.savefig(save_fname, facecolor=ax.get_facecolor(), dpi=200)
+    return 
+
     
 def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
     """
@@ -455,7 +642,7 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
           },
           ...
         }
-
+    
     Produces a single 2x2 figure for each `key`:
       (1) Accuracy vs. Comm. Cost   (top-left)
       (2) Accuracy vs. Comm. Loss   (top-right)
@@ -719,6 +906,7 @@ def generate_visualizations(experiment_logs, code, dataset_root, gen_images=Fals
     torch.cuda.manual_seed_all(seed)
     
     experiments = defaultdict(lambda: defaultdict(list))
+    table_experiments = defaultdict(lambda: defaultdict(list))
     
     _, test_loader = dataset.get_cifar10_data(batch_size=64,
     data_folder_path = os.path.join(dataset_root, 'cifar10-data'))
@@ -750,25 +938,43 @@ def generate_visualizations(experiment_logs, code, dataset_root, gen_images=Fals
         comm_loss = compute_communication_loss(model, partition_data)
         model_spar = compute_model_sparsity(model, partition_data, mode=sparsity_mode)
          
-        accuracy = load_best_accuracy(folder_path)
-        
+        accuracy = load_best_accuracy(folder_path)        
         if accuracy is None:
             print(f"SKIPPING FOR FOLDER: {folder}, acc")
             continue
+
+        eval_cost = load_new_comm_cost(folder_path)
+        if eval_cost is None:
+            print(f"SKIPPING FOR FOLDER: {folder}, eval_cost")
+            continue
+        eval_cost_aggregate = load_new_comm_cost2(folder_path)
+        if eval_cost_aggregate is None:
+            print(f"SKIPPING FOR FOLDER: {folder}, eval_cost_aggregate")
+            continue
+        print("accuracy, comm_cost, eval_cost, eval_cost_aggregate: ", accuracy, comm_cost, eval_cost, eval_cost_aggregate)    
+        model_spar_kernel = compute_model_sparsity(model, partition_data, mode="kernel")
+        #model_spar_pr = compute_model_sparsity(model, partition_data, mode="partition_row")  
         
         key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['experiment_flag'])
         experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar))
+        
+        table_experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate))
         
         if gen_images:
             plot_layer(model, partition_data, random.sample(range(1, len(partition_data['layers'])+1), 3), os.path.join(experiment_logs, "layer_vis"), key, '-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']]))
             
     # Once we have 'experiments' populated, plot all metrics
+    #print(experiments)
     plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
+
+    plot_table_metrics(table_experiments, output_dir=experiment_logs)
+    
     print("✅  Visualizations saved!")
+    return
     
     
 if __name__ == "__main__":
-    experiment_logs_path = "experiment_logs"
+    experiment_logs_path = "experiment_logs_servicenetwork"
     code = "cifar10"
     dataset_root = "./assets/data"
     generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")

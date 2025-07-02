@@ -35,7 +35,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
         #print("!!!!!!!!!!! BATCH IDX: ", batch_idx)
         # TT
         # Run for smaller dataset
-        control=True   # True: run for smaller dataset
+        control=False   # True: run for smaller dataset
         if batch_idx > 20 and control:
             break
         

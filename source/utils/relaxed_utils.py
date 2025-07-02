@@ -13,6 +13,8 @@ import copy
 import sys
 from ..utils.assignment import *
 
+from ..core.admm import *
+
 
 def Y_update(model,ADMM,configs):
     ADMM.prev_Y=copy.deepcopy(ADMM.Y)
@@ -72,31 +74,18 @@ def test_prunning(model,Ps,admm,s="mmmmm"):
             E=admm.getE(W)
             E[E!=0]=1
             (n1,n2)=E.shape
-            '''
-            for i in range(n1):
-                for j in range(n2):
-                    total+=1
-                    if E[i,j]==0:
-                        zeros+=1
-            '''
             total=n1*n2
             zeros=total-E.sum()
-            print(name,total,zeros,zeros/total)
+            print("kernels",name,total,zeros,zeros/total)
             #lin alg
             P=admm.getPin(name,Ps)
             needs=E@P
             needs[needs!=0]=1
             (n,m)=needs.shape
-            '''
-            for i in range(n):
-                for j in range(m):
-                    totalp+=1
-                    if needs[i,j]==0:
-                        zerosp+=1
-            '''
             totalp=n*m
             zerosp=totalp-needs.sum()
-            print(name,totalp,zerosp,zerosp/totalp)
+            print("rows",name,totalp,zerosp,zerosp/totalp)
+            print("off rows",name,(totalp-n),(zerosp-n),(zerosp-n)/(totalp-n))
             print(admm.prune_ratios[name])
 
 
@@ -173,7 +162,7 @@ def comunication_penalty1(model,ADMM,configs,P,eval=False):
         #TT
         #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name)
         #print(torch.abs(W).sum((2,3)) .shape,penalty_com(ra,name,device="cuda").shape)
-        E=ADMM.getE(W)
+        E=ADMM.getE(W,eval)
         if eval:
             E[E!=0]=1
         comm_cost = E * layer_penalty_com(name,ADMM,P)
@@ -198,7 +187,7 @@ def comunication_penalty2(model,ADMM,configs,P,dif=False, ret=False,eval=False):
         #TT
         #print("+++++ name, W.shape:, ", name, W.shape)
         #print(torch.abs(W).sum((2,3)) .shape,penalty_com(ra,name,device="cuda").shape)
-        E=ADMM.getE(W)
+        E=ADMM.getE(W,eval)
         #print("+++++ E.shape:, ", name, E.shape)
         comm_cost = layer_penalty_com2(ADMM,name,E,P,dif, ret)
         ccms.append(comm_cost.item())
@@ -275,7 +264,9 @@ def solve_relaxed_assignment(model,ADMM,configs):
         loss.backward()
         optimizer.step()
 
-def evaluate_comm(model,admm,configs,P):
+def evaluate_comm(model,configs,P):
+    admm=ADMM(configs, model, rho=configs['rho'])
     comm_cost=comunication_penalty1(model,admm,configs,P,eval=True)
     comm_cost2 =comunication_penalty2(model,admm,configs,P,eval=True)
     return comm_cost,comm_cost2
+    
