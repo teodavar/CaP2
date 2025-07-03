@@ -12,7 +12,7 @@ import random
 import pandas as pd
 from plottable import ColumnDefinition, Table
 
-from source.utils import dataset
+from source.utils.misc import *
 
 def parse_experiment_folder(folder_name):
     """
@@ -23,7 +23,16 @@ def parse_experiment_folder(folder_name):
 )
     match = pattern.match(folder_name)
     if match:
-        return match.groupdict()
+        experiment_details = match.groupdict()
+        experiment_details['run'] = experiment_details['sparsity_type'] + "_" + \
+            experiment_details['experiment_flag'] + "_" + experiment_details['reassign_flag']
+        words = experiment_details['sparsity_type'].split('_')
+        #print(words)
+        if words[0] == 'partition':
+            experiment_details['topology'] = words[2]
+        else:
+            experiment_details['topology'] = words[1]
+        return experiment_details
     return None
 
 def load_best_accuracy(folder_path):
@@ -485,6 +494,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     eval_costs = []
     eval_cost_aggregates = []
     kernel_sparcities = []
+    kbs = []
 
     for key, reassignments in table_experiments.items():
         key_string = key[0] + "_" + (key[1])
@@ -510,6 +520,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
                 eval_costs.append(run[6])
                 eval_cost_aggregates.append(run[7])
                 kernel_sparcities.append(round(run[5],2))
+                kbs.append(round(run[4],1))  # total_kbits
                 topologies.append(topology)   
     '''
     print('Penalty: ', penalties)
@@ -526,7 +537,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
 
     dict = {'Penalty': penalties, 'Partitions': partitions, 'Topology': topologies, 
         'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Accuracy': accuracies, 'Kernel Sparcity': kernel_sparcities, 
-        'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates} 
+        'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates, 'Comm Cost(MB)': kbs} 
     
     df = pd.DataFrame(dict)
     df = df.set_index("Penalty")
@@ -543,6 +554,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
         "Eval Cost",
         "Aggregate Cost",
         "Kernel Sparcity",
+        "Comm Cost(MB)",
     ]
 
     col_defs = (
@@ -597,6 +609,12 @@ def plot_table_metrics(table_experiments, output_dir="."):
         ),
         ColumnDefinition(
             name="Kernel Sparcity",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.75,
+        ),
+        ColumnDefinition(
+            name="Comm Cost(MB)",
             #group="Team Rating",
             textprops={"ha": "center"},
             width=0.75,
@@ -782,6 +800,7 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
         #ax_spars.legend()
         
         # Create a single legend further below the plots
+        print(legend_entries)
         handles = [plt.Line2D([0], [0], linestyle=style, marker=mark, color=col, markersize=10, label=lbl) 
                    for style, mark, col, lbl in legend_entries]
         fig.legend(handles=handles, loc='lower center', fontsize=14, ncol=4, bbox_to_anchor=(0.5, -0.08))
@@ -893,8 +912,8 @@ def plot_all_metrics_interactive(experiments, output_dir=".", sparsity_mode="ker
         print(f"📊 Interactive plot saved: {html_path}")
 
 
-
-def generate_visualizations(experiment_logs, code, dataset_root, gen_images=False, sparsity_mode="kernel", seed=1234):
+#def generate_visualizations(experiment_logs, code, dataset_root, gen_images=False, sparsity_mode="kernel", seed=1234):
+def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="kernel", seed=1234):
     """
     Generates accuracy vs. communication cost plots and bar charts.
     """
@@ -906,10 +925,13 @@ def generate_visualizations(experiment_logs, code, dataset_root, gen_images=Fals
     torch.cuda.manual_seed_all(seed)
     
     experiments = defaultdict(lambda: defaultdict(list))
+    exp_experiments = defaultdict(lambda: defaultdict(list))
     table_experiments = defaultdict(lambda: defaultdict(list))
     
+    '''
     _, test_loader = dataset.get_cifar10_data(batch_size=64,
-    data_folder_path = os.path.join(dataset_root, 'cifar10-data'))
+        data_folder_path = os.path.join(dataset_root, 'cifar10-data'))
+    '''
     
     for folder in os.listdir(experiment_logs):
         folder_path = os.path.join(experiment_logs, folder)
@@ -931,7 +953,15 @@ def generate_visualizations(experiment_logs, code, dataset_root, gen_images=Fals
             print(f"SKIPPING FOR FOLDER: {folder}, partition_data")
             continue
         
-        model = models.__dict__[experiment_details['model']](nn.Conv2d, nn.BatchNorm2d, num_classes=10)
+        if experiment_details["model"] == "resnet18":
+            model = models.__dict__[experiment_details['model']](nn.Conv2d, nn.BatchNorm2d, num_classes=10)
+        elif experiment_details["model"] == "resnet101":
+            model = models.__dict__[experiment_details['model']](get_layers('regular'), get_bn_layers('regular'), num_classes=100)
+        '''
+        model_r = models.__dict__[experiment_details['model']](get_layers('regular'), get_bn_layers('regular'),
+                                                       num_classes=self.configs['num_classes'])
+        '''
+
         model.load_state_dict(torch.load(model_state_path, map_location=torch.device('cpu')))
         
         comm_cost, total_kbits = compute_communication_cost_and_kbits(model, partition_data)
@@ -958,23 +988,31 @@ def generate_visualizations(experiment_logs, code, dataset_root, gen_images=Fals
         key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['experiment_flag'])
         experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar))
         
+        exp_key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['topology'])
+        exp_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar))
+        
+
         table_experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate))
         
         if gen_images:
             plot_layer(model, partition_data, random.sample(range(1, len(partition_data['layers'])+1), 3), os.path.join(experiment_logs, "layer_vis"), key, '-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']]))
             
     # Once we have 'experiments' populated, plot all metrics
-    #print(experiments)
+    print("11111111111111111111111111111111")
     plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
+    print("22222222222222222222222222222222222")
+    print(exp_experiments)
+    plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
 
     plot_table_metrics(table_experiments, output_dir=experiment_logs)
     
     print("✅  Visualizations saved!")
-    return
+    return experiments
     
     
 if __name__ == "__main__":
-    experiment_logs_path = "experiment_logs_servicenetwork"
-    code = "cifar10"
-    dataset_root = "./assets/data"
-    generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")
+    experiment_logs_path = "experiment_logs_resnet18"
+    #code = "cifar10"        # valid cifar10, cifar100
+    #dataset_root = "./assets/data"
+    #generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")
+    generate_visualizations(experiment_logs_path, gen_images=False, sparsity_mode="kernel")
