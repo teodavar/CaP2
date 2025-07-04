@@ -484,8 +484,9 @@ def extend_non_complete_runs(exp, runs_0):
 
 # Refer to https://github.com/znstrider/plottable/blob/master/docs/example_notebooks/wwc_example.ipynb
 def plot_table_metrics(table_experiments, output_dir="."):
+    datacodes = []
+    models = []
     topologies = []
-    penalties = []
     partitions = []
     exp_runs = []
     prune_ratios = []
@@ -497,22 +498,21 @@ def plot_table_metrics(table_experiments, output_dir="."):
     kbs = []
 
     for key, reassignments in table_experiments.items():
-        key_string = key[0] + "_" + (key[1])
-        #print("KEYYYYY: ", key_string)
+        #print("KEYYYYY: ", key)
+        datacode = key[0]
+        model = key[1]
         partition = key[2]
-        penalty = key[3]
+        topology = key[3]
         #print(partition, penalty)
         for idx, (reassign_flag, runs) in enumerate(reassignments.items()):
-            #print(reassign_flag)
-            first_split = reassign_flag.split("-")
-            admm_epochs = first_split[1]
-            second_split = reassign_flag.split("_")
-            topology = second_split[2]
+            #print("reassign_flag: ", reassign_flag)
+        
             for run in runs:
                 #print("-----------------")
                 #print(run)
                 partitions.append(partition)
-                penalties.append(penalty)
+                models.append(model)
+                datacodes.append(datacode)
                 exp_runs.append(reassign_flag)
                 prune_ratios.append(run[0])
                 accuracies.append(run[1])
@@ -535,45 +535,50 @@ def plot_table_metrics(table_experiments, output_dir="."):
     print('Aggregate Cost:', eval_cost_aggregates)
     '''
 
-    dict = {'Penalty': penalties, 'Partitions': partitions, 'Topology': topologies, 
-        'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Accuracy': accuracies, 'Kernel Sparcity': kernel_sparcities, 
+    dict = {'Dataset': datacodes, 'Model': models, 'Topology': topologies, 'Partitions': partitions, 
+        'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Accuracy': accuracies, 
         'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates, 'Comm Cost(MB)': kbs} 
-    
+
     df = pd.DataFrame(dict)
-    df = df.set_index("Penalty")
+    df = df.set_index("Dataset")
     #print(df)  
 
     colnames = [
-        "Penalty",
-        "Partitions",
+        "Dataset",
+        "Model"
         "Topology",
+        "Partitions",
         "Run",
         "Prune Ratio",
         "Accuracy",
         "Comm Cost",
         "Eval Cost",
         "Aggregate Cost",
-        "Kernel Sparcity",
         "Comm Cost(MB)",
     ]
 
     col_defs = (
     [
         ColumnDefinition(
-            name="Penalty",
+            name="Dataset",
             textprops={"ha": "left"},
-            width=0.75,
+            width=0.5,
         ),
         ColumnDefinition(
-            name="Partitions",
-            textprops={"ha": "center"},
-            width=0.75,
+            name="Model",
+            textprops={"ha": "left"},
+            width=0.5,
         ),
         ColumnDefinition(
             name="Topology",
             #group="Team Rating",
+            textprops={"ha": "left"},
+            width=0.5,
+        ),
+        ColumnDefinition(
+            name="Partitions",
             textprops={"ha": "center"},
-            width=0.75,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Run",
@@ -608,12 +613,6 @@ def plot_table_metrics(table_experiments, output_dir="."):
             width=0.75,
         ),
         ColumnDefinition(
-            name="Kernel Sparcity",
-            #group="Team Rating",
-            textprops={"ha": "center"},
-            width=0.75,
-        ),
-        ColumnDefinition(
             name="Comm Cost(MB)",
             #group="Team Rating",
             textprops={"ha": "center"},
@@ -625,7 +624,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     plt.rcParams["savefig.bbox"] = "tight"
 
     fig, ax = plt.subplots(figsize=(20, 12))
-    fig.suptitle(f"Table Metrics for {key_string}", fontsize=10, y=0.9)
+    fig.suptitle(f"Experiments' Metrics", fontsize=10, y=0.9)
 
     table = Table(
         df,
@@ -641,7 +640,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
 
     save_fname = os.path.join(
             output_dir,
-            f"{key_string}_table_metrics.png"
+            f"experiments_metrics.png"
         )
     fig.savefig(save_fname, facecolor=ax.get_facecolor(), dpi=200)
     return 
@@ -800,7 +799,7 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
         #ax_spars.legend()
         
         # Create a single legend further below the plots
-        print(legend_entries)
+        #print(legend_entries)
         handles = [plt.Line2D([0], [0], linestyle=style, marker=mark, color=col, markersize=10, label=lbl) 
                    for style, mark, col, lbl in legend_entries]
         fig.legend(handles=handles, loc='lower center', fontsize=14, ncol=4, bbox_to_anchor=(0.5, -0.08))
@@ -992,26 +991,26 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
         exp_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar))
         
 
-        table_experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate))
+        table_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate))
         
         if gen_images:
             plot_layer(model, partition_data, random.sample(range(1, len(partition_data['layers'])+1), 3), os.path.join(experiment_logs, "layer_vis"), key, '-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']]))
             
     # Once we have 'experiments' populated, plot all metrics
-    print("11111111111111111111111111111111")
+    #print("11111111111111111111111111111111")
     plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
-    print("22222222222222222222222222222222222")
-    print(exp_experiments)
+    #print("22222222222222222222222222222222222")
+    #print(exp_experiments)
     plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
 
     plot_table_metrics(table_experiments, output_dir=experiment_logs)
     
     print("✅  Visualizations saved!")
-    return experiments
+    return table_experiments
     
     
 if __name__ == "__main__":
-    experiment_logs_path = "experiment_logs_resnet18"
+    experiment_logs_path = "experiment_logs_uniform"
     #code = "cifar10"        # valid cifar10, cifar100
     #dataset_root = "./assets/data"
     #generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")
