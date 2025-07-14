@@ -220,7 +220,8 @@ class MoP:
                 artifact = wandb.Artifact(name="final_partition", type="config")
                 artifact.add_file(os.path.join(experiment_dir, f"partition_final"))
                 wandb.log_artifact(artifact)
-            torch.save(self.model.state_dict(), os.path.join(experiment_dir, "final_model.pt"))
+            # TT
+            #torch.save(self.model.state_dict(), os.path.join(experiment_dir, "final_model.pt"))
             # test sparsity
             test_kernel_sparsity(self.model, partition=self.configs['partition'])
             test_partition_with_free_channels(self.model, partition=self.configs['partition'], use_wandb=self.configs['use_wandb'], epoch=nepoch+2)
@@ -280,6 +281,7 @@ class MoP:
                                                 self.configs['retrain_opt'], self.configs['retrain_lr'], nepoch)
         
             best = 0
+            latest = 0
             try:
                 for cepoch in range(0, nepoch+1):
                     if cepoch>0:
@@ -287,6 +289,7 @@ class MoP:
                         _ = standard_train(self.configs, cepoch, self.model, self.train_loader, 
                                     criterion, optimizer, scheduler, masks=masks, old_comm_loss=True)
                     test_loss, acc = self.test_model(self.model, criterion, cepoch)
+                    latest = acc
                     if acc > best:
                         best = acc
                         save_model(self.model, os.path.join(self.configs['experiment_dir'], 'fine_tuned.pt'))
@@ -299,6 +302,7 @@ class MoP:
             eval_cost,eval_cost_aggregate=evaluate_comm(self.model,self.configs,self.configs["new_P"])
             with open(best_acc_path, 'w') as f:
                 f.write(f"Best Fine-Tuned Accuracy: {best:.4f}%\n")
+                f.write(f"Latest Fine-Tuned Accuracy: {latest:.4f}%\n")
                 f.write(f"Best Fine-Tuned eval_cost: {eval_cost}\n")
                 f.write(f"Best Fine-Tuned eval_cost_aggregate: {eval_cost_aggregate}\n")
             
@@ -335,7 +339,7 @@ class MoP:
         hard_prune(admm, self.model, self.configs['sparsity_type'], option=None)
         test_filter_sparsity(self.model)
             
-    def finetuneWeight(self):
+    def c(self):
         self.model_r = models.__dict__[self.configs['model']](get_layers('regular'), get_bn_layers('regular'),
                                                        num_classes=self.configs['num_classes'],
                                                        ).to(self.device)

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import time
 import wandb
+from .masks import neurons_per_machine
 from munkres import Munkres
 from scipy.optimize import linear_sum_assignment
 
@@ -168,14 +169,10 @@ def add_virtualmachines(cost_matrix, budget=None):
         assert np.isclose(sum(budget), 1.0), f"Budget percentages must sum to 1. Got {sum(budget)} instead."
 
         # Compute number of virtual machines per machine based on percentage
-        raw_capacities = np.array(budget) * n_tasks
-        machine_capacities = np.round(raw_capacities).astype(int)
-
-        # Adjust last machine to ensure total tasks match
-        difference = n_tasks - sum(machine_capacities)
-        machine_capacities[-1] += difference  # Fix rounding issues
-
+        machine_capacities = neurons_per_machine(budget,n_tasks)
+        
     # Expand cost matrix by repeating each column according to its assigned capacity
+    #print("!!!!@@@@",machine_capacities,machine_capacities)
     cost_expanded = np.repeat(cost_matrix, machine_capacities, axis=1)
 
     return cost_expanded, machine_capacities

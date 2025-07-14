@@ -132,32 +132,6 @@ class ADMM:
             if name in admm.prune_ratios:
                 Weights[name]=W
         return Weights
-
-    def test_prunning(self,Ws,Ps,s="mmmmm"):
-        test=False
-        zeros=0
-        total=0
-        zerosp=0
-        totalp=0
-        print(s)
-        for (name,W) in Ws.items():
-            #simple
-            E=self.getE(W)
-            E[E!=0]=1
-            (n1,n2)=E.shape
-            total=n1*n2
-            zeros=total-E.sum()
-            print(name,total,zeros,zeros/total)
-            #lin alg
-            P=self.getPin(name,Ps)
-            needs=E@P
-            needs[needs!=0]=1
-            (n,m)=needs.shape
-            totalp=n*m
-            zerosp=totalp-needs.sum()
-            print(name,totalp,zerosp,zerosp/totalp)
-            print(name,(totalp-n),(zerosp-n),(zerosp-n)/(totalp-n))
-            print(self.prune_ratios[name])
     
     def return_assignment(self,hard=True):
         if self.approach=="original":
@@ -391,8 +365,8 @@ class ADMM:
             return torch.from_numpy(weight).to(device)
 
         elif sparsity_type == "partition_row" :
-            E=W**2
-            needs=torch.sqrt(E@P)
+            E=W
+            needs=E@P
             #W[W!=0]=1
             needs=W@P
             Pout=Ps[name]
@@ -416,6 +390,13 @@ class ADMM:
 
             mask=res1@torch.transpose(P,0,1)
             mask[mask!=0]=1
+
+            res2=1-res1
+            mask2=res2@torch.transpose(P,0,1)
+            mask2[mask2!=0]=1
+            mask2=1-mask2
+            mask=mask2 #dual pruning priority 
+
             if len(weight.shape)==2:
                 weight=mask*weight
             else:
@@ -598,7 +579,14 @@ def test_prunning(model,Ps,admm,s="mmmmm"):
             totalp=n*m
             zerosp=totalp-needs.sum()
             print("rows",name,totalp,zerosp,zerosp/totalp)
-            print("off rows",name,(totalp-n),(zerosp-n),(zerosp-n)/(totalp-n))
+            
+
+            Pout=Ps[name]
+            c2=1-Pout
+            offneeds=needs*c2
+            offtotalp=totalp-n
+            offzerosp=offtotalp-offneeds.sum()
+            print("off rows",offtotalp,offzerosp,offzerosp/offtotalp)
             print(admm.prune_ratios[name])
 
 
@@ -787,6 +775,9 @@ def evaluate_comm(model,configs,P):
 
 
                
+#########################################################################
+#########################################################################
+#LEGACY CODE
 #########################################################################
 #########################################################################
 

@@ -49,10 +49,22 @@ def load_best_accuracy(folder_path):
             return float(match.group(1))
     return None
 
+def load_latest_accuracy(folder_path):
+    """
+    Reads the latest accuracy value from best_accuracy.txt.
+    """
+    best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
+    if not os.path.exists(best_acc_file):
+        return None
+    
+    with open(best_acc_file, 'r') as f:
+        match = re.search(r'Latest Fine-Tuned Accuracy: ([0-9\.]+)%', f.read())
+        if match:
+            return float(match.group(1))
+    return None
+
 def load_new_comm_cost(folder_path):
-    """
-    Reads the best accuracy value from best_accuracy.txt.
-    """
+
     best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
     if not os.path.exists(best_acc_file):
         return None
@@ -64,9 +76,7 @@ def load_new_comm_cost(folder_path):
     return None
 
 def load_new_comm_cost2(folder_path):
-    """
-    Reads the best accuracy value from best_accuracy.txt.
-    """
+
     best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
     if not os.path.exists(best_acc_file):
         return None
@@ -491,6 +501,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     exp_runs = []
     prune_ratios = []
     accuracies = []
+    latest_accuracies = []
     comm_costs = []
     eval_costs = []
     eval_cost_aggregates = []
@@ -521,6 +532,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
                 eval_cost_aggregates.append(run[7])
                 kernel_sparcities.append(round(run[5],2))
                 kbs.append(round(run[4],1))  # total_kbits
+                latest_accuracies.append(run[8])
                 topologies.append(topology)   
     '''
     print('Penalty: ', penalties)
@@ -536,7 +548,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     '''
 
     dict = {'Dataset': datacodes, 'Model': models, 'Topology': topologies, 'Partitions': partitions, 
-        'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Accuracy': accuracies, 
+        'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Best Accuracy': accuracies, 'Last Accuracy': latest_accuracies,
         'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates, 'Comm Cost(MB)': kbs} 
 
     df = pd.DataFrame(dict)
@@ -550,7 +562,8 @@ def plot_table_metrics(table_experiments, output_dir="."):
         "Partitions",
         "Run",
         "Prune Ratio",
-        "Accuracy",
+        "Best Accuracy",
+        "Last Accuracy",
         "Comm Cost",
         "Eval Cost",
         "Aggregate Cost",
@@ -562,18 +575,18 @@ def plot_table_metrics(table_experiments, output_dir="."):
         ColumnDefinition(
             name="Dataset",
             textprops={"ha": "left"},
-            width=0.5,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Model",
             textprops={"ha": "left"},
-            width=0.5,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Topology",
             #group="Team Rating",
             textprops={"ha": "left"},
-            width=0.5,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Partitions",
@@ -583,47 +596,53 @@ def plot_table_metrics(table_experiments, output_dir="."):
         ColumnDefinition(
             name="Run",
             textprops={"ha": "left"},
-            width=3,
+            width=2.5,
         ),
         ColumnDefinition(
             name="Prune Ratio",
             textprops={"ha": "center"},
-            width=0.75,
+            width=0.35,
         ),
         ColumnDefinition(
-            name="Accuracy",
+            name="Best Accuracy",
             #group="Team Rating",
             textprops={"ha": "center"},
-            width=0.75,
+            width=0.35,
+        ),
+        ColumnDefinition(
+            name="Last Accuracy",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.35,
         ),
         ColumnDefinition(
             name="Comm Cost",
             textprops={"ha": "left"},
-            width=0.75,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Aggregate Cost",
             textprops={"ha": "center"},
-            width=0.75,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Eval Cost",
             #group="Team Rating",
             textprops={"ha": "center"},
-            width=0.75,
+            width=0.35,
         ),
         ColumnDefinition(
             name="Comm Cost(MB)",
             #group="Team Rating",
             textprops={"ha": "center"},
-            width=0.75,
+            width=0.35,
         ),
     ])
 
     plt.rcParams["font.family"] = ["DejaVu Sans"]
     plt.rcParams["savefig.bbox"] = "tight"
 
-    fig, ax = plt.subplots(figsize=(20, 12))
+    fig, ax = plt.subplots(figsize=(25, 14))
     fig.suptitle(f"Experiments' Metrics", fontsize=10, y=0.9)
 
     table = Table(
@@ -716,7 +735,7 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
             linestyle = linestyles[1] if 'partition_row' in reassign_flag else linestyles[0]
             #print(reassign_flag, runs)
             runs_sorted = sorted(runs, key=lambda x: x[0])  # sort by prune_ratio
-            pr_vals, acc_vals, cost_vals, loss_vals, kbits_vals, spar_vals = map(lambda vals: [to_float(v) for v in vals], zip(*runs_sorted))
+            pr_vals, acc_vals, cost_vals, loss_vals, kbits_vals, spar_vals, latest_acc_vals = map(lambda vals: [to_float(v) for v in vals], zip(*runs_sorted))
 
             # Pick a color from the custom list
             color = colors[idx % len(colors)]
@@ -972,6 +991,11 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
             print(f"SKIPPING FOR FOLDER: {folder}, acc")
             continue
 
+        latest_accuracy = load_latest_accuracy(folder_path)        
+        if latest_accuracy is None:
+            print(f"SKIPPING FOR FOLDER: {folder}, latest acc")
+            continue
+
         eval_cost = load_new_comm_cost(folder_path)
         if eval_cost is None:
             print(f"SKIPPING FOR FOLDER: {folder}, eval_cost")
@@ -985,13 +1009,13 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
         #model_spar_pr = compute_model_sparsity(model, partition_data, mode="partition_row")  
         
         key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['experiment_flag'])
-        experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar))
+        experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy))
         
         exp_key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['topology'])
-        exp_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar))
+        exp_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy))
         
 
-        table_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate))
+        table_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate, latest_accuracy))
         
         if gen_images:
             plot_layer(model, partition_data, random.sample(range(1, len(partition_data['layers'])+1), 3), os.path.join(experiment_logs, "layer_vis"), key, '-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']]))
@@ -1000,7 +1024,7 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
     #print("11111111111111111111111111111111")
     plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
     #print("22222222222222222222222222222222222")
-    #print(exp_experiments)
+    print(exp_experiments)
     plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
 
     plot_table_metrics(table_experiments, output_dir=experiment_logs)
@@ -1010,7 +1034,10 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
     
     
 if __name__ == "__main__":
-    experiment_logs_path = "experiment_logs_uniform"
+    # experiment_logs_dtelecom, experiment_logs_abilene, 
+    # experiment_logs_watts_strogatz, experiment_logs_barabasi_albert
+    # experiment_logs_barabasi_uniform
+    experiment_logs_path = "experiment_logs_uniform_costs"
     #code = "cifar10"        # valid cifar10, cifar100
     #dataset_root = "./assets/data"
     #generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")

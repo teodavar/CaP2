@@ -261,19 +261,26 @@ def generate_partition(configs, model):
     
     configs['partition'] = partition
     return configs
-    
+
 def fixsum(a,shape):
-    total=np.sum(a)
+    a_int = np.floor(a).astype(int)
+    total=np.sum(a_int)
     dif=shape-total
     d=np.sign(dif)
     c=0
-    for i in range(a.size):
+    for i in range(a_int.size):
         if c>=np.abs(dif):
             break
         if a[i]!=0:
-            a[i]+=d
+            a_int[i]+=d
             c+=1
-    return a
+    return a_int
+
+def neurons_per_machine(budget,shape):
+    absolute_counts = np.array(budget) * shape
+    #print("!!!! absolute_counts 1: ", absolute_counts)
+    absolute_counts=fixsum(absolute_counts,shape)
+    return absolute_counts
 
 def get_partition_from_code(dataset, shape, num_partitions, budget, random_assign=False):
     """
@@ -307,9 +314,7 @@ def get_partition_from_code(dataset, shape, num_partitions, budget, random_assig
 
     # Compute the absolute filter allocation per partition with rounding
     #print("!!!! budget: ", budget)
-    absolute_counts = np.round(np.array(budget) * shape).astype(int)
-    #print("!!!! absolute_counts 1: ", absolute_counts)
-    fixsum(absolute_counts,shape)
+    absolute_counts = neurons_per_machine(budget,shape)
     #print("!!!! absolute_counts --- after fixsum: ", absolute_counts)
 
 

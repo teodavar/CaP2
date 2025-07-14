@@ -5,8 +5,8 @@
 dataset=cifar10
 model=resnet18
 
-# dataset=cifar100
-# model=wrn28_10
+dataset=cifar100
+model=resnet101
 
 # dataset=esc
 # model=EscFusion

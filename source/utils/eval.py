@@ -254,7 +254,8 @@ class ExperimentLogger:
             plt.title(f"{label} over Epochs")
             plt.legend()
             plt.grid()
-            plt.savefig(os.path.join(self.experiment_dir, f"{key}.png"))
+            # TT
+            #plt.savefig(os.path.join(self.experiment_dir, f"{key}.png"))
             plt.close()
             
         # Special case: Handling "P_costs"
@@ -273,7 +274,8 @@ class ExperimentLogger:
                 plt.title("P Assignment Cost over Training")
                 plt.legend()
                 plt.grid()
-                plt.savefig(os.path.join(self.experiment_dir, "P_costs.png"))
+                # TT
+                #plt.savefig(os.path.join(self.experiment_dir, "P_costs.png"))
                 plt.close()
 
             else:
