@@ -1030,14 +1030,14 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
     plot_table_metrics(table_experiments, output_dir=experiment_logs)
     
     print("✅  Visualizations saved!")
-    return table_experiments
+    return exp_experiments
     
     
 if __name__ == "__main__":
     # experiment_logs_dtelecom, experiment_logs_abilene, 
     # experiment_logs_watts_strogatz, experiment_logs_barabasi_albert
     # experiment_logs_barabasi_uniform
-    experiment_logs_path = "experiment_logs_uniform_costs"
+    experiment_logs_path = "experiment_logs_uniform_4"
     #code = "cifar10"        # valid cifar10, cifar100
     #dataset_root = "./assets/data"
     #generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")
