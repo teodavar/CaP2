@@ -494,6 +494,8 @@ def extend_non_complete_runs(exp, runs_0):
 
 # Refer to https://github.com/znstrider/plottable/blob/master/docs/example_notebooks/wwc_example.ipynb
 def plot_table_metrics(table_experiments, output_dir="."):
+
+
     datacodes = []
     models = []
     topologies = []
@@ -503,6 +505,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     accuracies = []
     latest_accuracies = []
     comm_costs = []
+    comm_losses = []
     eval_costs = []
     eval_cost_aggregates = []
     kernel_sparcities = []
@@ -528,6 +531,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
                 prune_ratios.append(run[0])
                 accuracies.append(run[1])
                 comm_costs.append(run[2])
+                comm_losses.append(round(run[3],1))
                 eval_costs.append(run[6])
                 eval_cost_aggregates.append(run[7])
                 kernel_sparcities.append(round(run[5],2))
@@ -549,10 +553,15 @@ def plot_table_metrics(table_experiments, output_dir="."):
 
     dict = {'Dataset': datacodes, 'Model': models, 'Topology': topologies, 'Partitions': partitions, 
         'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Best Accuracy': accuracies, 'Last Accuracy': latest_accuracies,
-        'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates, 'Comm Cost(MB)': kbs} 
+        'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates, 'Comm Cost(MB)': kbs,
+        'Comm Loss': comm_losses, 'Sparcity': kernel_sparcities} 
 
     df = pd.DataFrame(dict)
+    save_fname = os.path.join(output_dir, f"experiments_metrics.csv")
+    df.to_csv(save_fname, index=False)
+    
     df = df.set_index("Dataset")
+      
     #print(df)  
 
     colnames = [
@@ -568,6 +577,9 @@ def plot_table_metrics(table_experiments, output_dir="."):
         "Eval Cost",
         "Aggregate Cost",
         "Comm Cost(MB)",
+        "Comm Loss",
+        "Sparcity",
+
     ]
 
     col_defs = (
@@ -637,12 +649,25 @@ def plot_table_metrics(table_experiments, output_dir="."):
             textprops={"ha": "center"},
             width=0.35,
         ),
+        ColumnDefinition(
+            name="Comm Loss",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.35,
+        ),
+        ColumnDefinition(
+            name="Sparcity",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.35,
+        ),
     ])
 
     plt.rcParams["font.family"] = ["DejaVu Sans"]
     plt.rcParams["savefig.bbox"] = "tight"
 
-    fig, ax = plt.subplots(figsize=(25, 14))
+    fig, ax = plt.subplots(figsize=(30, 20))
+
     fig.suptitle(f"Experiments' Metrics", fontsize=10, y=0.9)
 
     table = Table(
@@ -658,9 +683,9 @@ def plot_table_metrics(table_experiments, output_dir="."):
     )#.autoset_fontcolors(colnames=["OFF", "DEF"])
 
     save_fname = os.path.join(
-            output_dir,
-            f"experiments_metrics.png"
-        )
+        output_dir,
+        f"experiments_metrics.png"
+    )
     fig.savefig(save_fname, facecolor=ax.get_facecolor(), dpi=200)
     return 
 
@@ -1024,20 +1049,20 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
     #print("11111111111111111111111111111111")
     plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
     #print("22222222222222222222222222222222222")
-    print(exp_experiments)
+    #print(exp_experiments)
     plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
 
     plot_table_metrics(table_experiments, output_dir=experiment_logs)
     
     print("✅  Visualizations saved!")
-    return exp_experiments
+    return exp_experiments, table_experiments
     
     
 if __name__ == "__main__":
     # experiment_logs_dtelecom, experiment_logs_abilene, 
     # experiment_logs_watts_strogatz, experiment_logs_barabasi_albert
     # experiment_logs_barabasi_uniform
-    experiment_logs_path = "experiment_logs_uniform_4"
+    experiment_logs_path = "experiment_logs_uniform_costs"
     #code = "cifar10"        # valid cifar10, cifar100
     #dataset_root = "./assets/data"
     #generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")
