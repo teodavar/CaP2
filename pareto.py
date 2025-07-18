@@ -11,6 +11,9 @@ from PIL import Image, ImageColor, ImageDraw, ImageOps
 import random
 import pandas as pd
 from plottable import ColumnDefinition, Table
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_recall_fscore_support
+
+from source.utils.dataset import *
 
 from source.utils.misc import *
 
@@ -354,6 +357,49 @@ def compute_model_sparsity(model, partition, mode="kernel"):
         return 0.0
     return zero_count / total_count
 
+
+def compute_roc_auc(model, test_loader, device='cpu'):
+    model = model.to(device)
+    
+    model.eval()
+    y_true = []
+    y_pred = []
+    y_score = []
+
+    with torch.no_grad():
+        for batch_idx, (inputs, labels) in enumerate(test_loader):
+            control=True   # True: run for smaller dataset
+            if batch_idx > 5 and control:
+                print("!!!! Running for SMALL dataset !!!!")
+                break
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+            probs = F.softmax(outputs, dim=1)
+
+            y_score.extend(probs.cpu().numpy())  # Untuk ROC AUC
+            y_pred.extend(torch.argmax(probs, dim=1).cpu().numpy())  # Pred label
+            y_true.extend(labels.cpu().numpy())  # Label ground truth
+
+    # Convert ke array numpy
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    y_score = np.array(y_score)
+
+    # ROC AUC Score (multi-class, macro average)
+    roc_auc = roc_auc_score(y_true, y_score, multi_class='ovr', average='macro')
+    acc = accuracy_score(y_true, y_pred)
+    print(f"\nMulti-class ROC AUC Score (macro): {roc_auc:.4f}, Accuracy: {acc:.4f}")
+
+    '''
+    prec, recall, fscore, _ = precision_recall_fscore_support(y_true, y_pred, average='macro')
+    print(f"\nPrecision (macro): {prec:.4f}")
+    print(f"\nRecall (macro): {recall:.4f}")
+    print(f"\nF1 Score (macro): {fscore:.4f}")
+    '''
+    return round(roc_auc,3), round(acc,3)
+    
 def plot_layer(model, partition, layer_ids, save_folder="layer_vis", key="", rsgn=""):
     """
     Generates **side-by-side visualizations** of layer connectivity:
@@ -510,6 +556,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     eval_cost_aggregates = []
     kernel_sparcities = []
     kbs = []
+    aucs = []
 
     for key, reassignments in table_experiments.items():
         #print("KEYYYYY: ", key)
@@ -537,6 +584,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
                 kernel_sparcities.append(round(run[5],2))
                 kbs.append(round(run[4],1))  # total_kbits
                 latest_accuracies.append(run[8])
+                aucs.append(run[9])
                 topologies.append(topology)   
     '''
     print('Penalty: ', penalties)
@@ -554,7 +602,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
     dict = {'Dataset': datacodes, 'Model': models, 'Topology': topologies, 'Partitions': partitions, 
         'Run': exp_runs, 'Prune Ratio': prune_ratios, 'Best Accuracy': accuracies, 'Last Accuracy': latest_accuracies,
         'Comm Cost': comm_costs, 'Eval Cost': eval_costs, 'Aggregate Cost': eval_cost_aggregates, 'Comm Cost(MB)': kbs,
-        'Comm Loss': comm_losses, 'Sparcity': kernel_sparcities} 
+        'Comm Loss': comm_losses, 'Sparcity': kernel_sparcities, 'AUC': aucs} 
 
     df = pd.DataFrame(dict)
     save_fname = os.path.join(output_dir, f"experiments_metrics.csv")
@@ -579,6 +627,7 @@ def plot_table_metrics(table_experiments, output_dir="."):
         "Comm Cost(MB)",
         "Comm Loss",
         "Sparcity",
+        "AUC"
 
     ]
 
@@ -661,6 +710,12 @@ def plot_table_metrics(table_experiments, output_dir="."):
             textprops={"ha": "center"},
             width=0.35,
         ),
+        ColumnDefinition(
+            name="AUC",
+            #group="Team Rating",
+            textprops={"ha": "center"},
+            width=0.35,
+        ),
     ])
 
     plt.rcParams["font.family"] = ["DejaVu Sans"]
@@ -689,8 +744,259 @@ def plot_table_metrics(table_experiments, output_dir="."):
     fig.savefig(save_fname, facecolor=ax.get_facecolor(), dpi=200)
     return 
 
-    
-def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
+# Prun ratios 1.0 and 0.0 are plotted as DOTs !!!
+def new_plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel", mode="ACC"):
+    pd.options.display.max_colwidth = 100
+    # Custom color cycle for each reassign_flag line
+    colors = ["#FFC20A", "#0C7BDC", "#D41159", "#004D40", "#45D86E", "#3E2717", "#FE7800"]
+    markers = ['.', '*', 'v', 'o']
+    linestyles = ['-', '--', '-.', ':']
+
+    all_runs = []
+    accs_pr_one = []
+    accs_pr_zero = []
+    costs_pr_one = []
+    costs_pr_zero = []
+    loss_pr_one = []
+    loss_pr_zero = []
+    kbits_pr_one = []
+    kbits_pr_zero = []
+
+    for key, reassignments in experiments.items():
+        
+        key_string = "_".join(key[:])
+        
+        # Create a new 2x2 figure
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 10))
+
+        # axes[0,0] => Accuracy vs. Comm. Cost
+        # axes[0,1] => Accuracy vs. Comm. Loss
+        # axes[1,0] => Accuracy vs. Kbits
+        # axes[1,1] => Sparsity vs. Kbits
+        
+        # For the cost, we use a “free-channels” logic expression, e.g.:
+        #   Cost(W,M) = sum_{l=1 to L} sum_{j=1}^{n_l} sum_{p != M(j)} c_{p,M(j)}
+        #        * 1{there exists i: W_l(i,j) != 0 and M(i)=p}
+        #
+        # For the loss, we sum over edges with absolute weights:
+        #   Loss(W,M) = sum_{l=1}^L sum_{(i,j) in E_l} c_{M(i), M(j)} * |W_l(i,j)|
+
+        # Convert axes to friendly names
+        ax_cost  = axes[0,0]
+        ax_loss  = axes[0,1]
+        ax_kbits = axes[1,0]
+        ax_spars = axes[1,1]
+        
+        legend_entries = []
+        
+        for idx, (reassign_flag, runs) in enumerate(reassignments.items()):
+            marker = markers[0] if 'fixed' in reassign_flag else markers[1]
+            # If you want to add a highlight line
+            marker = markers[2] if 'prune_comm' in reassign_flag else marker
+            linestyle = linestyles[1] if 'partition_row' in reassign_flag else linestyles[0]
+            #print(reassign_flag, runs)
+            runs_sorted = sorted(runs, key=lambda x: x[0])  # sort by prune_ratio
+            if reassign_flag.find("kernel") == -1:
+                # Does NOT contain Kernel
+                all_runs.append(reassign_flag)
+                #print("====", reassign_flag)
+                #print("zzz", runs_sorted[0][0])
+                #print("ooo", runs_sorted[-1][0])
+                if runs_sorted[0][0] == 0.0:
+                    #print("XXXXX: ", runs_sorted[0][0], runs_sorted[0][1])
+                    if mode == "ACC":
+                        accs_pr_zero.append(runs_sorted[0][1]) # accuracy
+                    elif mode == "AUC":
+                        accs_pr_zero.append(runs_sorted[0][7])  # roc_auc
+                    costs_pr_zero.append(runs_sorted[0][2])
+                    loss_pr_zero.append(runs_sorted[0][3])
+                    kbits_pr_zero.append(runs_sorted[0][4])
+
+                    pr_ratio_zero = runs_sorted.pop(0)
+                    
+                if runs_sorted[-1][0] == 1.0:
+                    #print("XXXXX: ", runs_sorted[-1][0], runs_sorted[-1][1])
+                    if mode == "ACC":
+                        accs_pr_one.append(runs_sorted[-1][1])  # accuracy
+                    elif mode == "AUC":
+                        accs_pr_one.append(runs_sorted[-1][7])  # roc_auc
+                    costs_pr_one.append(runs_sorted[-1][2])
+                    loss_pr_one.append(runs_sorted[-1][3])
+                    kbits_pr_one.append(runs_sorted[-1][4])
+
+                    pr_ratio_one = runs_sorted.pop(-1)
+                    
+                #print("final: runs_sorted: ", runs_sorted)
+            pr_vals, acc_vals, cost_vals, loss_vals, kbits_vals, spar_vals, latest_acc_vals, roc_auc_vals = map(lambda vals: [to_float(v) for v in vals], zip(*runs_sorted))
+
+            # Pick a color from the custom list
+            color = colors[idx % len(colors)]
+            legend_entries.append((linestyle, marker, color, reassign_flag))
+
+            if mode == "ACC":
+                y_values = acc_vals
+                inline_text = "Accuracy"
+                ylabel_text = "Accuracy (%)"
+            elif mode == "AUC":
+                inline_text = "AUC"
+                ylabel_text = "AUC"
+                y_values = roc_auc_vals
+
+            # 1) Accuracy vs. Comm. Cost
+            ax_cost.plot(cost_vals, y_values, marker=marker, markersize=12, linestyle=linestyle, 
+                            label=f"{reassign_flag}", color=color)
+            for i, prr in enumerate(pr_vals):
+                ax_cost.text(cost_vals[i], y_values[i], f"pr={prr}", fontsize=10)
+            
+            # 2) Accuracy vs. Comm. Loss
+            ax_loss.plot(loss_vals, y_values, marker=marker, markersize=12, linestyle=linestyle, 
+                            label=f"{reassign_flag}", color=color)
+            for i, prr in enumerate(pr_vals):
+                ax_loss.text(loss_vals[i], y_values[i], f"pr={prr}", fontsize=10)
+
+            # 3) Accuracy vs. Kbits
+            ax_kbits.plot(kbits_vals, y_values, marker=marker, markersize=12, linestyle=linestyle, 
+                            label=f"{reassign_flag}", color=color)
+            for i, prr in enumerate(pr_vals):
+                ax_kbits.text(kbits_vals[i], y_values[i], f"pr={prr}", fontsize=10)
+
+            # 4) Sparsity vs. Kbits
+            ax_spars.plot(kbits_vals, spar_vals, marker=marker, markersize=12, linestyle=linestyle, 
+                            label=f"{reassign_flag}", color=color)
+            for i, prr in enumerate(pr_vals):
+                ax_spars.text(kbits_vals[i], spar_vals[i], f"pr={prr}", fontsize=10)
+
+        # ----------------------------------------------------------------
+        # Titles with LaTeX formulas for Comm. Cost & Comm. Loss
+        # ----------------------------------------------------------------
+
+        # Top-left: Comm. Cost formula
+        ax_cost.set_title(
+            inline_text + " vs. Comm. Cost\n" +
+            r"$\mathrm{Cost}(\mathbf{W},\mathbf{M}) = "
+            r"\sum_{l=1}^{L}\sum_{j=1}^{n_l}\sum_{p\neq \mathbf{M}(j)}"
+            r" c_{p,\mathbf{M}(j)} \cdot 1_{\{\exists i : W_l(i,j)\neq 0,\,M(i)=p\}}$"
+        )
+
+        ax_loss.set_title(
+            inline_text + " vs. Comm. Loss\n" +
+            r"$\mathrm{Loss}(\mathbf{W},\mathbf{M}) = "
+            r"\sum_{l=1}^{L}\sum_{(i,j)\in E_l} "
+            r"c_{M(i), M(j)} \cdot |W_l(i,j)|$"
+        )
+
+        # Bottom-left: Accuracy vs Kbits
+        ax_kbits.set_title(inline_text + " vs. Kbits Transmitted")
+        # Bottom-right: Sparsity vs Kbits
+        ax_spars.set_title(f"{sparsity_mode.capitalize()} Sparsity vs. Kbits")
+
+        # ----------------------------------------------------------------
+        # Axis labels, grid, legend, etc.
+        # ----------------------------------------------------------------
+
+        # Top-left
+        ax_cost.set_xlabel("Comm. Cost")
+        ax_cost.set_ylabel(ylabel_text)
+        ax_cost.grid(True)
+        #ax_cost.legend()
+
+        # Top-right
+        ax_loss.set_xlabel("Comm. Loss")
+        ax_loss.set_ylabel(ylabel_text)
+        ax_loss.grid(True)
+        #ax_loss.legend()
+
+        # Bottom-left
+        ax_kbits.set_xlabel("Kbits Transmitted")
+        ax_kbits.set_ylabel(ylabel_text)
+        ax_kbits.grid(True)
+        #ax_kbits.legend()
+
+        # Bottom-right
+        ax_spars.set_xlabel("Kbits Transmitted")
+        ax_spars.set_ylabel(f"{sparsity_mode.capitalize()} Sparsity")
+        ax_spars.grid(True)
+        #ax_spars.legend()
+
+
+        #print(len(all_runs))
+        #print(accs_pr_one) 
+        #print(accs_pr_zero)  
+
+        data = {'runs': all_runs,
+                'accs_pr_zero': accs_pr_zero,
+                'accs_pr_one': accs_pr_one,
+                'costs_pr_zero': costs_pr_zero,
+                'costs_pr_one': costs_pr_one,
+                'loss_pr_zero': loss_pr_zero,
+                'loss_pr_one': loss_pr_one,
+                'kbits_pr_zero': kbits_pr_zero,
+                'kbits_pr_one': kbits_pr_one,
+                } 
+        df = pd.DataFrame(data)
+        max_zero_idx = df['accs_pr_zero'].idxmax()
+        max_one_idx = df['accs_pr_one'].idxmax()
+        #print(df)
+        #print(max_zero_idx, max_one_idx)
+        acc_vs_comm_cost_one = (df.loc[max_one_idx, 'runs'], df.loc[max_one_idx, 'costs_pr_one'], df.loc[max_one_idx, 'accs_pr_one'] )
+        acc_vs_comm_cost_zero = (df.loc[max_zero_idx, 'runs'], df.loc[max_zero_idx, 'costs_pr_zero'], df.loc[max_zero_idx, 'accs_pr_zero'])
+        acc_vs_comm_loss_one = (df.loc[max_one_idx, 'runs'], df.loc[max_one_idx, 'loss_pr_one'], df.loc[max_one_idx, 'accs_pr_one'] )
+        acc_vs_comm_loss_zero = (df.loc[max_zero_idx, 'runs'], df.loc[max_zero_idx, 'loss_pr_zero'], df.loc[max_zero_idx, 'accs_pr_zero'])
+        acc_vs_comm_kbits_one = (df.loc[max_one_idx, 'runs'], df.loc[max_one_idx, 'kbits_pr_one'], df.loc[max_one_idx, 'accs_pr_one'] )
+        acc_vs_comm_kbits_zero = (df.loc[max_zero_idx, 'runs'], df.loc[max_zero_idx, 'kbits_pr_zero'], df.loc[max_zero_idx, 'accs_pr_zero'])
+        #print(acc_vs_comm_cost_one)
+        #print(acc_vs_comm_cost_zero)
+
+        # Add prune ratios 0.0 and 1.0 at Accuracy vs. Comm. Cost plot
+        # 'ro': red dot, 'bs': blue square
+        ax_cost.plot(acc_vs_comm_cost_one[1], acc_vs_comm_cost_one[2], 'ro', markersize=10, label='Square dots')
+        ax_cost.plot(acc_vs_comm_cost_zero[1], acc_vs_comm_cost_zero[2], 'bs', markersize=10, label='Square dots')
+        ax_cost.text(acc_vs_comm_cost_one[1], acc_vs_comm_cost_one[2], f"pr=1.0", fontsize=10)
+        ax_cost.text(acc_vs_comm_cost_zero[1], acc_vs_comm_cost_zero[2], f"pr=0.0", fontsize=10)
+
+        # Add prune ratios 0.0 and 1.0 at Accuracy vs. Comm. Loss plot
+        # 'ro': red dot, 'bs': blue square
+        ax_loss.plot(acc_vs_comm_loss_one[1], acc_vs_comm_loss_one[2], 'ro', markersize=10, label='Square dots')
+        ax_loss.plot(acc_vs_comm_loss_zero[1], acc_vs_comm_loss_zero[2], 'bs', markersize=10, label='Square dots')
+        ax_loss.text(acc_vs_comm_loss_one[1], acc_vs_comm_loss_one[2], f"pr=1.0", fontsize=10)
+        ax_loss.text(acc_vs_comm_loss_zero[1], acc_vs_comm_loss_zero[2], f"pr=0.0", fontsize=10)
+
+        # Add prune ratios 0.0 and 1.0 at Accuracy vs. Kbits plot
+        # 'ro': red dot, 'bs': blue square
+        ax_kbits.plot(acc_vs_comm_kbits_one[1], acc_vs_comm_kbits_one[2], 'ro', markersize=10, label='Square dots')
+        ax_kbits.plot(acc_vs_comm_kbits_zero[1], acc_vs_comm_kbits_zero[2], 'bs', markersize=10, label='Square dots')
+        ax_kbits.text(acc_vs_comm_kbits_one[1], acc_vs_comm_kbits_one[2], f"pr=1.0", fontsize=10)
+        ax_kbits.text(acc_vs_comm_kbits_zero[1], acc_vs_comm_kbits_zero[2], f"pr=0.0", fontsize=10)
+
+
+        legend_entries.append(('', 'o', "red", acc_vs_comm_cost_one[0]))
+        legend_entries.append(('', 's', "blue", acc_vs_comm_cost_zero[0]))
+        
+
+        # Create a single legend further below the plots
+        #print(legend_entries)
+        handles = [plt.Line2D([0], [0], linestyle=style, marker=mark, color=col, markersize=10, label=lbl) 
+                    for style, mark, col, lbl in legend_entries]
+        fig.legend(handles=handles, loc='lower center', fontsize=14, ncol=4, bbox_to_anchor=(0.5, -0.08))
+
+        # Optional figure-level title referencing `key`
+        fig.suptitle(f"All Metrics for {key_string}", fontsize=14, y=0.9)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.90])  # leaves space for suptitle
+
+        # Save the figure
+        if mode == "ACC":
+            save_fname = os.path.join(output_dir, f"{key_string}_dot_metrics.png")
+        elif mode == "AUC":
+            save_fname = os.path.join(output_dir, f"{key_string}_auc_dot_metrics.png")
+        plt.savefig(save_fname, bbox_inches='tight')
+        plt.close()
+        print(f"Saved figure to {save_fname}")
+
+
+
+# Valid values for mode: ACC, AUC        
+def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel", mode="ACC"):
     """
     We assume 'experiments' is a dict:
         experiments = {
@@ -760,29 +1066,38 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
             linestyle = linestyles[1] if 'partition_row' in reassign_flag else linestyles[0]
             #print(reassign_flag, runs)
             runs_sorted = sorted(runs, key=lambda x: x[0])  # sort by prune_ratio
-            pr_vals, acc_vals, cost_vals, loss_vals, kbits_vals, spar_vals, latest_acc_vals = map(lambda vals: [to_float(v) for v in vals], zip(*runs_sorted))
+            pr_vals, acc_vals, cost_vals, loss_vals, kbits_vals, spar_vals, latest_acc_vals, roc_auc_vals = map(lambda vals: [to_float(v) for v in vals], zip(*runs_sorted))
 
             # Pick a color from the custom list
             color = colors[idx % len(colors)]
             legend_entries.append((linestyle, marker, color, reassign_flag))
 
+            if mode == "ACC":
+                y_values = acc_vals
+                inline_text = "Accuracy"
+                ylabel_text = "Accuracy (%)"
+            elif mode == "AUC":
+                inline_text = "AUC"
+                ylabel_text = "AUC"
+                y_values = roc_auc_vals
+
             # 1) Accuracy vs. Comm. Cost
-            ax_cost.plot(cost_vals, acc_vals, marker=marker, markersize=12, linestyle=linestyle, 
+            ax_cost.plot(cost_vals, y_values, marker=marker, markersize=12, linestyle=linestyle, 
                          label=f"{reassign_flag}", color=color)
             for i, prr in enumerate(pr_vals):
-                ax_cost.text(cost_vals[i], acc_vals[i], f"pr={prr}", fontsize=10)
+                ax_cost.text(cost_vals[i], y_values[i], f"pr={prr}", fontsize=10)
 
             # 2) Accuracy vs. Comm. Loss
-            ax_loss.plot(loss_vals, acc_vals, marker=marker, markersize=12, linestyle=linestyle, 
+            ax_loss.plot(loss_vals, y_values, marker=marker, markersize=12, linestyle=linestyle, 
                          label=f"{reassign_flag}", color=color)
             for i, prr in enumerate(pr_vals):
-                ax_loss.text(loss_vals[i], acc_vals[i], f"pr={prr}", fontsize=10)
+                ax_loss.text(loss_vals[i], y_values[i], f"pr={prr}", fontsize=10)
 
             # 3) Accuracy vs. Kbits
-            ax_kbits.plot(kbits_vals, acc_vals, marker=marker, markersize=12, linestyle=linestyle, 
+            ax_kbits.plot(kbits_vals, y_values, marker=marker, markersize=12, linestyle=linestyle, 
                          label=f"{reassign_flag}", color=color)
             for i, prr in enumerate(pr_vals):
-                ax_kbits.text(kbits_vals[i], acc_vals[i], f"pr={prr}", fontsize=10)
+                ax_kbits.text(kbits_vals[i], y_values[i], f"pr={prr}", fontsize=10)
 
             # 4) Sparsity vs. Kbits
             ax_spars.plot(kbits_vals, spar_vals, marker=marker, markersize=12, linestyle=linestyle, 
@@ -796,21 +1111,21 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
 
         # Top-left: Comm. Cost formula
         ax_cost.set_title(
-            "Accuracy vs. Comm. Cost\n" +
+            inline_text + " vs. Comm. Cost\n" +
             r"$\mathrm{Cost}(\mathbf{W},\mathbf{M}) = "
             r"\sum_{l=1}^{L}\sum_{j=1}^{n_l}\sum_{p\neq \mathbf{M}(j)}"
             r" c_{p,\mathbf{M}(j)} \cdot 1_{\{\exists i : W_l(i,j)\neq 0,\,M(i)=p\}}$"
         )
 
         ax_loss.set_title(
-            "Accuracy vs. Comm. Loss\n" +
+            inline_text + " vs. Comm. Loss\n" +
             r"$\mathrm{Loss}(\mathbf{W},\mathbf{M}) = "
             r"\sum_{l=1}^{L}\sum_{(i,j)\in E_l} "
             r"c_{M(i), M(j)} \cdot |W_l(i,j)|$"
         )
 
         # Bottom-left: Accuracy vs Kbits
-        ax_kbits.set_title("Accuracy vs. Kbits Transmitted")
+        ax_kbits.set_title(inline_text + " vs. Kbits Transmitted")
         # Bottom-right: Sparsity vs Kbits
         ax_spars.set_title(f"{sparsity_mode.capitalize()} Sparsity vs. Kbits")
 
@@ -820,19 +1135,19 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
 
         # Top-left
         ax_cost.set_xlabel("Comm. Cost")
-        ax_cost.set_ylabel("Accuracy (%)")
+        ax_cost.set_ylabel(ylabel_text)
         ax_cost.grid(True)
         #ax_cost.legend()
 
         # Top-right
         ax_loss.set_xlabel("Comm. Loss")
-        ax_loss.set_ylabel("Accuracy (%)")
+        ax_loss.set_ylabel(ylabel_text)
         ax_loss.grid(True)
         #ax_loss.legend()
 
         # Bottom-left
         ax_kbits.set_xlabel("Kbits Transmitted")
-        ax_kbits.set_ylabel("Accuracy (%)")
+        ax_kbits.set_ylabel(ylabel_text)
         ax_kbits.grid(True)
         #ax_kbits.legend()
 
@@ -854,14 +1169,15 @@ def plot_all_metrics(experiments, output_dir=".", sparsity_mode="kernel"):
         plt.tight_layout(rect=[0, 0, 1, 0.90])  # leaves space for suptitle
 
         # Save the figure
-        save_fname = os.path.join(
-            output_dir,
-            f"{key_string}_metrics.png"
-        )
+        if mode == "ACC":
+            save_fname = os.path.join(output_dir, f"{key_string}_metrics.png")
+        elif mode == "AUC":
+            save_fname = os.path.join(output_dir, f"{key_string}_auc_metrics.png")
         plt.savefig(save_fname, bbox_inches='tight')
         plt.close()
         print(f"Saved figure to {save_fname}")
-        
+
+       
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
@@ -956,7 +1272,7 @@ def plot_all_metrics_interactive(experiments, output_dir=".", sparsity_mode="ker
 
 
 #def generate_visualizations(experiment_logs, code, dataset_root, gen_images=False, sparsity_mode="kernel", seed=1234):
-def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="kernel", seed=1234):
+def generate_visualizations(experiment_logs, test_loader, gen_images=False, sparsity_mode="kernel", device="cpu", seed=1234):
     """
     Generates accuracy vs. communication cost plots and bar charts.
     """
@@ -977,6 +1293,8 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
     '''
     
     for folder in os.listdir(experiment_logs):
+   
+
         folder_path = os.path.join(experiment_logs, folder)
         if not os.path.isdir(folder_path):
             continue
@@ -985,6 +1303,8 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
         if not experiment_details:
             print(f"SKIPPING FOR FOLDER: {folder}, details")
             continue
+        print("\n------- Running for: ", folder)
+        print("\n")
         
         model_state_path = os.path.join(folder_path, "fine_tuned.pt")
         if not os.path.exists(model_state_path):
@@ -1005,12 +1325,12 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
                                                        num_classes=self.configs['num_classes'])
         '''
 
-        model.load_state_dict(torch.load(model_state_path, map_location=torch.device('cpu')))
+        model.load_state_dict(torch.load(model_state_path, map_location=torch.device(device)))
         
         comm_cost, total_kbits = compute_communication_cost_and_kbits(model, partition_data)
         comm_loss = compute_communication_loss(model, partition_data)
         model_spar = compute_model_sparsity(model, partition_data, mode=sparsity_mode)
-         
+        
         accuracy = load_best_accuracy(folder_path)        
         if accuracy is None:
             print(f"SKIPPING FOR FOLDER: {folder}, acc")
@@ -1031,30 +1351,59 @@ def generate_visualizations(experiment_logs, gen_images=False, sparsity_mode="ke
             continue
         #print("accuracy, comm_cost, eval_cost, eval_cost_aggregate: ", accuracy, comm_cost, eval_cost, eval_cost_aggregate)    
         model_spar_kernel = compute_model_sparsity(model, partition_data, mode="kernel")
-        #model_spar_pr = compute_model_sparsity(model, partition_data, mode="partition_row")  
+
+        # @@@@ AUC
         
+        best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
+        if not os.path.exists(best_acc_file):
+            print(f"SKIPPING FOR FOLDER: {folder}, roc_auc")
+            continue
+
+        with open(best_acc_file, 'r') as f:
+            match = re.search(r'Best ROC_AUC: ([0-9\.]+)', f.read())
+            if match is None:
+                print("Not Found")
+                roc_auc, _ = compute_roc_auc(model, test_loader, device='cpu')
+                #print(roc_auc)
+                best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
+                with open(best_acc_file, 'a') as f:
+                    f.write(f"Best ROC_AUC: {roc_auc}\n")
+            else:
+                roc_auc = float(match.group(1))
+                print("Found !!!! ROC_AUC: ", roc_auc)
+
+
         key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['experiment_flag'])
-        experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy))
+        experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy, roc_auc))
         
         exp_key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['topology'])
-        exp_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy))
+        exp_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy, roc_auc))
         
 
-        table_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate, latest_accuracy))
+        table_experiments[exp_key]['-'.join([experiment_details['run']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, eval_cost, eval_cost_aggregate, latest_accuracy, roc_auc))
         
         if gen_images:
             plot_layer(model, partition_data, random.sample(range(1, len(partition_data['layers'])+1), 3), os.path.join(experiment_logs, "layer_vis"), key, '-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']]))
-            
-    # Once we have 'experiments' populated, plot all metrics
-    #print("11111111111111111111111111111111")
-    plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
-    #print("22222222222222222222222222222222222")
-    #print(exp_experiments)
-    plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode)
-
-    plot_table_metrics(table_experiments, output_dir=experiment_logs)
     
-    print("✅  Visualizations saved!")
+    plot = True
+    if plot:
+        # Once we have 'experiments' populated, plot all metrics
+        plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="ACC")
+
+        # Run plots per experiment
+        # Valid values for mode: ACC, AUC 
+        plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="ACC")
+
+        plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="AUC")
+
+        # Plot best runs of prune ratios 1.0 and 0.0 as dots
+        new_plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="ACC")
+        new_plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="AUC")
+
+        #Plot in tabular form
+        plot_table_metrics(table_experiments, output_dir=experiment_logs)
+    
+        print("✅  Visualizations saved!")
     return exp_experiments, table_experiments
     
     
@@ -1062,8 +1411,10 @@ if __name__ == "__main__":
     # experiment_logs_dtelecom, experiment_logs_abilene, 
     # experiment_logs_watts_strogatz, experiment_logs_barabasi_albert
     # experiment_logs_barabasi_uniform
-    experiment_logs_path = "experiment_logs_uniform_costs"
-    #code = "cifar10"        # valid cifar10, cifar100
-    #dataset_root = "./assets/data"
-    #generate_visualizations(experiment_logs_path, code, dataset_root, gen_images=False, sparsity_mode="kernel")
-    generate_visualizations(experiment_logs_path, gen_images=False, sparsity_mode="kernel")
+    experiment_logs_path = "experiment_logs"
+    data_code = "cifar10"        # valid cifar10, cifar100
+    batch_size = 128
+    device = "cpu"
+    _, test_loader = get_dataset_from_code(data_code, batch_size)
+
+    generate_visualizations(experiment_logs_path, test_loader, gen_images=False, sparsity_mode="kernel", device="cpu")
