@@ -368,7 +368,7 @@ def compute_roc_auc(model, test_loader, device='cpu'):
 
     with torch.no_grad():
         for batch_idx, (inputs, labels) in enumerate(test_loader):
-            control=True   # True: run for smaller dataset
+            control=False   # True: run for smaller dataset
             if batch_idx > 5 and control:
                 print("!!!! Running for SMALL dataset !!!!")
                 break
@@ -1350,10 +1350,11 @@ def generate_visualizations(experiment_logs, test_loader, gen_images=False, spar
             print(f"SKIPPING FOR FOLDER: {folder}, eval_cost_aggregate")
             continue
         #print("accuracy, comm_cost, eval_cost, eval_cost_aggregate: ", accuracy, comm_cost, eval_cost, eval_cost_aggregate)    
-        model_spar_kernel = compute_model_sparsity(model, partition_data, mode="kernel")
+        #model_spar_kernel = compute_model_sparsity(model, partition_data, mode="kernel")
 
         # @@@@ AUC
-        
+        roc_auc = 0.0
+        '''
         best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
         if not os.path.exists(best_acc_file):
             print(f"SKIPPING FOR FOLDER: {folder}, roc_auc")
@@ -1362,7 +1363,7 @@ def generate_visualizations(experiment_logs, test_loader, gen_images=False, spar
         with open(best_acc_file, 'r') as f:
             match = re.search(r'Best ROC_AUC: ([0-9\.]+)', f.read())
             if match is None:
-                print("Not Found")
+                print("ROC_AUC Not Found in best_accuracy.txy file... Start computing it!")
                 roc_auc, _ = compute_roc_auc(model, test_loader, device='cpu')
                 #print(roc_auc)
                 best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
@@ -1370,8 +1371,8 @@ def generate_visualizations(experiment_logs, test_loader, gen_images=False, spar
                     f.write(f"Best ROC_AUC: {roc_auc}\n")
             else:
                 roc_auc = float(match.group(1))
-                print("Found !!!! ROC_AUC: ", roc_auc)
-
+                print("File best_accuracy.txt contains ROC_AUC: ", roc_auc)
+        '''
 
         key = (experiment_details['data_code'], experiment_details['model'], experiment_details['num_partition'], experiment_details['experiment_flag'])
         experiments[key]['-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']])].append((float(experiment_details['pr_ratio']), accuracy, comm_cost, comm_loss, total_kbits, model_spar, latest_accuracy, roc_auc))
@@ -1385,7 +1386,7 @@ def generate_visualizations(experiment_logs, test_loader, gen_images=False, spar
         if gen_images:
             plot_layer(model, partition_data, random.sample(range(1, len(partition_data['layers'])+1), 3), os.path.join(experiment_logs, "layer_vis"), key, '-'.join([experiment_details['sparsity_type'], experiment_details['reassign_flag']]))
     
-    plot = True
+    plot = False
     if plot:
         # Once we have 'experiments' populated, plot all metrics
         plot_all_metrics(experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="ACC")
@@ -1393,12 +1394,11 @@ def generate_visualizations(experiment_logs, test_loader, gen_images=False, spar
         # Run plots per experiment
         # Valid values for mode: ACC, AUC 
         plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="ACC")
-
-        plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="AUC")
+        #plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="AUC")
 
         # Plot best runs of prune ratios 1.0 and 0.0 as dots
         new_plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="ACC")
-        new_plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="AUC")
+        #new_plot_all_metrics(exp_experiments, output_dir=experiment_logs, sparsity_mode=sparsity_mode, mode="AUC")
 
         #Plot in tabular form
         plot_table_metrics(table_experiments, output_dir=experiment_logs)
@@ -1410,11 +1410,16 @@ def generate_visualizations(experiment_logs, test_loader, gen_images=False, spar
 if __name__ == "__main__":
     # experiment_logs_dtelecom, experiment_logs_abilene, 
     # experiment_logs_watts_strogatz, experiment_logs_barabasi_albert
-    # experiment_logs_barabasi_uniform
-    experiment_logs_path = "experiment_logs"
-    data_code = "cifar10"        # valid cifar10, cifar100
+    # experiment_logs_uniform
+    experiment_logs_path = "experiment_logs_abilene_costs"
+    data_code = "cifar100"        # valid cifar10, cifar100
     batch_size = 128
     device = "cpu"
-    _, test_loader = get_dataset_from_code(data_code, batch_size)
-
-    generate_visualizations(experiment_logs_path, test_loader, gen_images=False, sparsity_mode="kernel", device="cpu")
+    mode = "ACC" # valid values: ACC, AUC
+    if mode == "AUC":
+        device = "cuda"
+        _, test_loader = get_dataset_from_code(data_code, batch_size)
+    else:
+        device = "cpu"
+    test_loader = None
+    generate_visualizations(experiment_logs_path, test_loader, gen_images=False, sparsity_mode="kernel", device=device)
