@@ -39,7 +39,7 @@ def parse_experiment_folder(folder_name):
     return None
 
 
-def compute_roc_auc(model, test_loader, device):
+def compute_roc_auc(model, test_loader, data_code, device):
     model = model.to(device)
     
     model.eval()
@@ -56,7 +56,7 @@ def compute_roc_auc(model, test_loader, device):
             labels = labels.to(device)
 
             outputs = model(inputs)
-            print(outputs.shape, labels.shape)
+            #print(outputs.shape, labels.shape)
             outx.append(outputs)
             labelx.append(labels)
     
@@ -64,7 +64,10 @@ def compute_roc_auc(model, test_loader, device):
     vxx = torch.cat(labelx, dim=0)
     vlabelx = torch.flatten(vxx)  
 
-    metric = MulticlassAUROC(num_classes=10)
+    if data_code == "cifar10":
+        metric = MulticlassAUROC(num_classes=10)
+    elif data_code == "cifar100":
+        metric = MulticlassAUROC(num_classes=100)
 
     metric.update(voutx, vlabelx)
     roc_auc = metric.compute()    
@@ -73,7 +76,7 @@ def compute_roc_auc(model, test_loader, device):
     return round(roc_auc.item(),4)
     
 
-def evaluate_roc_auc(experiment_logs, test_loader, device, seed=1234):
+def evaluate_roc_auc(experiment_logs, test_loader, data_code, device, seed=1234):
 
     # Set all seeds
     torch.manual_seed(seed)
@@ -128,7 +131,7 @@ def evaluate_roc_auc(experiment_logs, test_loader, device, seed=1234):
             match = re.search(r'Best ROC_AUC: ([0-9\.]+)', f.read())
             if match is None:
                 print("ROC_AUC Not Found in best_accuracy.txy file... Start computing it!")
-                roc_auc = compute_roc_auc(model, test_loader, device)
+                roc_auc = compute_roc_auc(model, test_loader, data_code, device)
                 #print(roc_auc)
                 best_acc_file = os.path.join(folder_path, "best_accuracy.txt")
                 with open(best_acc_file, 'a') as f:
@@ -143,11 +146,12 @@ def evaluate_roc_auc(experiment_logs, test_loader, device, seed=1234):
 if __name__ == "__main__":
     # experiment_logs_dtelecom, experiment_logs_abilene, 
     # experiment_logs_watts_strogatz, experiment_logs_barabasi_albert
-    # experiment_logs_barabasi_uniform
-    experiment_logs_path = "experiment_logs"
+    # experiment_logs_uniform
+    experiment_logs_path = "experiment_logs_uniform_10"
     data_code = "cifar10"        # valid cifar10, cifar100
     batch_size = 128
     device = "cuda"
+   
     _, test_loader = get_dataset_from_code(data_code, batch_size)
 
-    evaluate_roc_auc(experiment_logs_path, test_loader, device=device)
+    evaluate_roc_auc(experiment_logs_path, test_loader, data_code, device)
