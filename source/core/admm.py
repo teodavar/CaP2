@@ -250,7 +250,10 @@ class ADMM:
 
             self.ADMM_Z[name]=self.WP(self.ADMM_Z[name],name,self.return_assignment(hard=True), sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
             
-            
+    def adoptparents(P,name):
+        #if name is layer with trasnsition from cnn to fc:
+        #    repeat P times kernel
+        return P     
     
     def U_update(self,config_dict,
                model,
@@ -268,9 +271,9 @@ class ADMM:
 
     def getPin(self,name,Ps):
         parents = self.partition[name].get('parents', [])
-        P=copy.deepcopy(Ps[parents[0]])
+        P=copy.deepcopy(self.adoptparents(Ps[parents[0]],name))
         for i in range(1,len(parents)):
-            P+=Ps[parents[i]]
+            P+=self.adoptparents(Ps[parents[i]],name)
         P[P!=0]=1
         return P
 
@@ -285,13 +288,13 @@ class ADMM:
         else:
             W= torch.norm(weight, dim=(2, 3))
         parents = partition[name].get('parents', [])
-        P=copy.deepcopy(Ps[parents[0]])
+        P=copy.deepcopy(self.adoptparents(Ps[parents[0]],name))
         
         for parent in parents: 
             if parent not in partition:
                 raise ValueError(f"Parent layer {parent} not found in partition dictionary.")
         for i in range(1,len(parents)):
-            P+=Ps[parents[i]]
+            P+=Ps[self.adoptparents(parents[i],name)]
         P[P!=0]=1
         
         if (sparsity_type == "irregular") :
@@ -464,9 +467,9 @@ class ADMM:
         
         if len(parents)==0:
             raise ValueError(f"no parents")
-        P=copy.deepcopy(Ps[parents[0]])
+        P=copy.deepcopy(self.adoptparents(Ps[parents[0]],name))
         for i in range(1,len(parents)):
-            P+=Ps[parents[i]]
+            P+=self.adoptparents(Ps[parents[i]],name)
         #print(E.device,P.device,self.C.device)
         if self.penalty=="full":
             needs=E@P
@@ -603,14 +606,14 @@ def V_update(model,ADMM,configs):
             #print(ADMM.ADMM_V.P[name])
             #sys.exit()
 
-def layer_penalty_com(layer_name,ADMM,P):
+def layer_penalty_com(E,layer_name,ADMM,P):
     #TT 
     n=ADMM.layer_info[layer_name]['layer_size']
     parents = ADMM.layer_info[layer_name].get('parents', [])
     if len(parents)==0:
         return 0
-    np=ADMM.layer_info[parents[0]]['layer_size']
-    comm_costs = torch.zeros((np,n)).float().to(ADMM.device)
+    #np=ADMM.layer_info[parents[0]]['layer_size']
+    comm_costs = 0 #torch.zeros((np,n)).float().to(ADMM.device)
     C=ADMM.C.to(ADMM.device)
     for parent in parents:
         #print(ra.P[parent].shape)
@@ -618,9 +621,9 @@ def layer_penalty_com(layer_name,ADMM,P):
         #print(torch.transpose(ra.P[layer_name],0,1).shape )
         #print(ADMM.P[parent].device,C.device,ADMM.P[layer_name].device)
         
-        comm_costs+=P[parent] @ C @ torch.transpose(P[layer_name],0,1)   
+        comm_costs+=torch.sum(E * torch.transpose((self.adoptparents(P[parent],layer_name) @ C @ torch.transpose(P[layer_name],0,1)),0,1).to(ADMM.device))
     #print(comm_costs.shape)
-    return torch.transpose(comm_costs,0,1).to(ADMM.device)
+    return comm_costs
 
 def layer_penalty_com2(ADMM,name,E,P,dif=False, ret=False):
     #TT 
@@ -633,7 +636,7 @@ def layer_penalty_com2(ADMM,name,E,P,dif=False, ret=False):
     C=ADMM.C.to(ADMM.device)
     for parent in parents:
         #print("----- parent: ", parent)
-        Pin=P[parent]
+        Pin=self.adoptparents(P[parent],name)
         Pout=P[name]
         needs=E@Pin
         if dif==False:
@@ -666,8 +669,8 @@ def comunication_penalty1(model,ADMM,configs,P,eval=False):
         E=ADMM.getE(W,eval)
         if eval:
             E[E!=0]=1
-        comm_cost = E * layer_penalty_com(name,ADMM,P)
-        comm_cost = comm_cost.view(comm_cost.size(0), -1).sum()
+        comm_cost = layer_penalty_com(E,name,ADMM,P)
+        #comm_cost = comm_cost.view(comm_cost.size(0), -1).sum()
         #print("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",name,comm_cost)
         if configs['comm_outsize']:
             comm_loss += comm_cost*ADMM.layer_info[name]['outsize']
