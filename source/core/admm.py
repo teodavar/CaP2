@@ -250,7 +250,7 @@ class ADMM:
 
             self.ADMM_Z[name]=self.WP(self.ADMM_Z[name],name,self.return_assignment(hard=True), sparsity_type, cross_x, cross_f)  # equivalent to Euclidean Projection
             
-    def adoptparents(P,name):
+    def adoptparents(self, P,name):
         #if name is layer with trasnsition from cnn to fc:
         #    repeat P times kernel
         return P     
@@ -434,11 +434,11 @@ class ADMM:
         self.prev_P=copy.deepcopy(self.P)
         P_costs=[]
         if self.approach=="original":
-            #print("timing P")
+            print("timing P")
             start=time.time()            
             if self.reassign:
                 solve_original_assignment(self,dif=True) 
-            #print(time.time()-start)
+            print(' @@@: update_assignment time is {:.2f}s.'.format(time.time()-start))
             P_costs.append(self.comunication_penalty().item()) # TT
         elif self.approach=="relaxed":
             #print("timing P")
@@ -621,7 +621,7 @@ def layer_penalty_com(E,layer_name,ADMM,P):
         #print(torch.transpose(ra.P[layer_name],0,1).shape )
         #print(ADMM.P[parent].device,C.device,ADMM.P[layer_name].device)
         
-        comm_costs+=torch.sum(E * torch.transpose((self.adoptparents(P[parent],layer_name) @ C @ torch.transpose(P[layer_name],0,1)),0,1).to(ADMM.device))
+        comm_costs+=torch.sum(E * torch.transpose((ADMM.adoptparents(P[parent],layer_name) @ C @ torch.transpose(P[layer_name],0,1)),0,1).to(ADMM.device))
     #print(comm_costs.shape)
     return comm_costs
 
@@ -636,7 +636,7 @@ def layer_penalty_com2(ADMM,name,E,P,dif=False, ret=False):
     C=ADMM.C.to(ADMM.device)
     for parent in parents:
         #print("----- parent: ", parent)
-        Pin=self.adoptparents(P[parent],name)
+        Pin=ADMM.adoptparents(P[parent],name)
         Pout=P[name]
         needs=E@Pin
         if dif==False:

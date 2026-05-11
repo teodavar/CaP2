@@ -133,7 +133,7 @@ def standard_train(configs, cepoch, model, data_loader, criterion, optimizer, sc
     # TT
     # Debugging
     #ADMM.ppp()
-    #print('Training time per epoch is {:.2f}s.'.format(time.time()-start_time))
+    print(' @@@: Training time per epoch is {:.2f}s.'.format(time.time()-start_time))
     metrics = {
         'batch_loss': batch_loss,
         'batch_total_loss': batch_total_loss,

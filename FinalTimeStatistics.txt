@@ -1,0 +1,796 @@
+Summary for: .\abilene\slurm-5443651.out  |  prefix: abilene_1
+Summary for: .\abilene\slurm-5457246_1.out  |  prefix: abilene_2
+Summary for: abilene\slurm-5457246_2.out  |  prefix: abilene_3
+Summary for: .\abilene_cost\slurm-5443656.out  |  prefix: abilene_cost_1
+Summary for: .\abilene_cost\slurm-5479931_1.out  |  prefix: abilene_cost_2
+Summary for: abilene_cost\slurm-5479931_2.out  |  prefix: abilene_cost_3
+Summary for: ./barabasi/slurm-5426245.out  |  prefix: barabasi_1
+Summary for: ./barabasi/slurm-5447253_1.out  |  prefix: barabasi_2
+Summary for: barabasi\slurm-5447253_2.out  |  prefix: barabasi_3
+Summary for: ./barabasi_cost/slurm-5426250.out  |  prefix: barabasi_cost_1
+Summary for: ./barabasi_cost/slurm-5447249_1.out  |  prefix: barabasi_cost_2
+Summary for: barabasi_cost\slurm-5447249_2.out  |  prefix: barabasi_cost_3
+Summary for: ./watts/slurm-5444606.out  |  prefix: watts_1_2
+Summary for: watts\slurm-5460475.out  |  prefix: watts_3
+Summary for: ./watts_cost/slurm-5444617.out  |  prefix: watts_cost_1
+Summary for: ./watts_cost/slurm-5480176_1.out  |  prefix: watts_cost_2
+Summary for: watts_cost\slurm-5480176_2.out  |  prefix: watts_cost_3
+Summary for: ./telecom/slurm-5447369.out  |  prefix: telecom_1a
+Summary for: ./telecom/slurm-5480358.out  |  prefix: telecom_1b
+Summary for: ./telecom/slurm-5462872_1.out  |  prefix: telecom_2
+Summary for: telecom\slurm-5462872_2.out  |  prefix: telecom_3
+Summary for: ./telecom_cost/slurm-5462040.out  |  prefix: telecom_cost_1_2a
+Summary for: ./telecom_cost/slurm-5480578.out  |  prefix: telecom_cost_2b
+Summary for: telecom_cost\slurm-5464381.out  |  prefix: telecom_cost_3
+
+
+=== Training times per epoch ===
+  pr0.0_np11_partition_row_Abilene_rsgn5_original_full
+    1 entries, avg 12.58s, total 12.58s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 23.62s, total 2361.98s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_full
+    100 entries, avg 21.95s, total 2194.75s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 23.94s, total 2417.99s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_full
+    101 entries, avg 22.31s, total 2252.86s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 23.96s, total 2420.07s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_full
+    101 entries, avg 22.25s, total 2247.55s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 23.95s, total 2418.46s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_full
+    100 entries, avg 21.34s, total 2134.01s
+  pr0.0_np11_partition_row_Abilene_cost_rsgn5_original_full
+    1 entries, avg 13.06s, total 13.06s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 25.22s, total 2522.14s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_full
+    100 entries, avg 22.11s, total 2210.94s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.92s, total 2617.57s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_full
+    101 entries, avg 21.92s, total 2213.64s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.95s, total 2621.18s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_full
+    101 entries, avg 22.04s, total 2226.50s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.93s, total 2618.87s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_full
+    100 entries, avg 21.76s, total 2175.79s
+  pr0.0_np11_kernel_Abilene_fixed_original_full
+    (no data)
+  pr0.5_np11_kernel_Abilene_fixed_original_full
+    60 entries, avg 21.58s, total 1295.05s
+  pr0.75_np11_kernel_Abilene_fixed_original_full
+    60 entries, avg 21.91s, total 1314.31s
+  pr0.85_np11_kernel_Abilene_fixed_original_full
+    60 entries, avg 22.17s, total 1329.98s
+  pr1.0_np11_kernel_Abilene_fixed_original_full
+    60 entries, avg 21.96s, total 1317.33s
+  pr0.0_np11_kernel_Abilene_cost_fixed_original_full
+    (no data)
+  pr0.5_np11_kernel_Abilene_cost_fixed_original_full
+    60 entries, avg 21.75s, total 1305.29s
+  pr0.75_np11_kernel_Abilene_cost_fixed_original_full
+    60 entries, avg 22.12s, total 1327.46s
+  pr0.85_np11_kernel_Abilene_cost_fixed_original_full
+    60 entries, avg 22.16s, total 1329.53s
+  pr1.0_np11_kernel_Abilene_cost_fixed_original_full
+    60 entries, avg 22.20s, total 1332.12s
+  pr0.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    1 entries, avg 14.03s, total 14.03s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 25.55s, total 2555.05s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    100 entries, avg 23.14s, total 2313.75s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 26.08s, total 2634.13s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    101 entries, avg 23.51s, total 2374.06s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 26.10s, total 2635.79s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    101 entries, avg 23.60s, total 2383.22s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 26.04s, total 2630.27s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    100 entries, avg 22.22s, total 2222.22s
+  pr0.0_np10_kernel_BarabasiAlbert_fixed_original_full
+    (no data)
+  pr0.5_np10_kernel_BarabasiAlbert_fixed_original_full
+    60 entries, avg 21.66s, total 1299.69s
+  pr0.75_np10_kernel_BarabasiAlbert_fixed_original_full
+    60 entries, avg 22.04s, total 1322.31s
+  pr0.85_np10_kernel_BarabasiAlbert_fixed_original_full
+    60 entries, avg 22.31s, total 1338.34s
+  pr1.0_np10_kernel_BarabasiAlbert_fixed_original_full
+    60 entries, avg 22.26s, total 1335.57s
+  pr0.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    1 entries, avg 13.92s, total 13.92s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 25.23s, total 2523.41s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    100 entries, avg 23.18s, total 2317.52s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.77s, total 2602.47s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    101 entries, avg 23.56s, total 2379.27s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.81s, total 2606.96s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    101 entries, avg 23.67s, total 2390.66s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.73s, total 2598.50s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    100 entries, avg 21.61s, total 2160.80s
+  pr0.0_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    (no data)
+  pr0.5_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    60 entries, avg 21.61s, total 1296.66s
+  pr0.75_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    60 entries, avg 21.94s, total 1316.19s
+  pr0.85_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    60 entries, avg 22.08s, total 1324.98s
+  pr1.0_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    60 entries, avg 22.11s, total 1326.47s
+  pr0.0_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    1 entries, avg 12.88s, total 12.88s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 23.22s, total 2322.07s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    100 entries, avg 21.46s, total 2145.68s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 23.49s, total 2372.31s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    101 entries, avg 21.80s, total 2201.37s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 23.51s, total 2374.43s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    101 entries, avg 22.12s, total 2234.44s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 23.72s, total 2395.40s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    101 entries, avg 22.44s, total 2266.50s
+  pr0.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    1 entries, avg 12.66s, total 12.66s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 25.28s, total 2527.61s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    100 entries, avg 21.34s, total 2133.64s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.78s, total 2603.86s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    101 entries, avg 21.54s, total 2175.53s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.88s, total 2614.10s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    101 entries, avg 21.57s, total 2178.83s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 25.06s, total 2530.56s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    100 entries, avg 21.41s, total 2141.41s
+  pr0.0_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    (no data)
+  pr0.5_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    60 entries, avg 21.38s, total 1282.74s
+  pr0.75_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    60 entries, avg 21.71s, total 1302.53s
+  pr0.85_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    60 entries, avg 21.70s, total 1301.89s
+  pr1.0_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    60 entries, avg 21.72s, total 1303.32s
+  pr0.0_np10_kernel_WattsStrogatz_fixed_original_full
+    (no data)
+  pr0.5_np10_kernel_WattsStrogatz_fixed_original_full
+    60 entries, avg 21.65s, total 1298.88s
+  pr0.75_np10_kernel_WattsStrogatz_fixed_original_full
+    60 entries, avg 21.72s, total 1302.98s
+  pr0.85_np10_kernel_WattsStrogatz_fixed_original_full
+    60 entries, avg 22.33s, total 1339.66s
+  pr1.0_np10_kernel_WattsStrogatz_fixed_original_full
+    60 entries, avg 21.99s, total 1319.11s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 24.06s, total 2405.61s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 24.24s, total 2448.51s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 24.39s, total 2463.52s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 24.33s, total 2457.83s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_full
+    100 entries, avg 21.84s, total 2184.37s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_full
+    101 entries, avg 22.09s, total 2231.57s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_full
+    101 entries, avg 22.13s, total 2235.26s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_full
+    101 entries, avg 22.09s, total 2231.34s
+  pr0.0_np68_kernel_Dtelekom_fixed_original_full
+    (no data)
+  pr0.5_np68_kernel_Dtelekom_fixed_original_full
+    60 entries, avg 22.07s, total 1323.96s
+  pr0.75_np68_kernel_Dtelekom_fixed_original_full
+    60 entries, avg 22.59s, total 1355.62s
+  pr0.85_np68_kernel_Dtelekom_fixed_original_full
+    60 entries, avg 22.90s, total 1373.85s
+  pr1.0_np68_kernel_Dtelekom_fixed_original_full
+    60 entries, avg 22.72s, total 1362.96s
+  pr0.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    1 entries, avg 12.84s, total 12.84s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    100 entries, avg 23.67s, total 2366.88s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    100 entries, avg 21.84s, total 2184.45s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 24.54s, total 2478.46s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    101 entries, avg 22.07s, total 2228.63s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 24.64s, total 2488.24s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    101 entries, avg 22.18s, total 2240.16s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    101 entries, avg 24.52s, total 2476.85s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    100 entries, avg 21.71s, total 2170.99s
+  pr0.0_np68_kernel_Dtelekom_cost_fixed_original_full
+    (no data)
+  pr0.5_np68_kernel_Dtelekom_cost_fixed_original_full
+    60 entries, avg 21.97s, total 1318.29s
+  pr0.75_np68_kernel_Dtelekom_cost_fixed_original_full
+    60 entries, avg 22.60s, total 1356.07s
+  pr0.85_np68_kernel_Dtelekom_cost_fixed_original_full
+    60 entries, avg 22.79s, total 1367.17s
+  pr1.0_np68_kernel_Dtelekom_cost_fixed_original_full
+    60 entries, avg 22.63s, total 1357.59s
+
+
+=== Update assignment times ===
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.19s, total 3.69s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_full
+    19 entries, avg 0.21s, total 3.90s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.49s, total 9.40s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_full
+    19 entries, avg 0.24s, total 4.64s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.32s, total 6.06s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_full
+    19 entries, avg 0.28s, total 5.25s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.26s, total 4.85s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_full
+    19 entries, avg 0.20s, total 3.75s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.33s, total 6.35s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_full
+    19 entries, avg 0.22s, total 4.26s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.58s, total 10.99s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_full
+    19 entries, avg 0.25s, total 4.73s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.43s, total 8.09s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_full
+    19 entries, avg 0.31s, total 5.97s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.33s, total 6.34s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_full
+    19 entries, avg 0.28s, total 5.40s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.12s, total 2.33s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    19 entries, avg 0.13s, total 2.43s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.44s, total 8.43s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    19 entries, avg 0.18s, total 3.47s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.34s, total 6.38s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    19 entries, avg 0.23s, total 4.46s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.26s, total 4.94s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    19 entries, avg 0.17s, total 3.17s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.22s, total 4.24s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    19 entries, avg 0.22s, total 4.20s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.53s, total 10.10s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    19 entries, avg 0.28s, total 5.34s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.41s, total 7.72s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    19 entries, avg 0.29s, total 5.52s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.30s, total 5.73s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    19 entries, avg 0.21s, total 3.93s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.14s, total 2.57s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    19 entries, avg 0.14s, total 2.61s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.38s, total 7.19s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    19 entries, avg 0.19s, total 3.60s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.30s, total 5.61s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    19 entries, avg 0.26s, total 4.96s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.24s, total 4.55s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    19 entries, avg 0.25s, total 4.69s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.21s, total 4.07s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    19 entries, avg 0.20s, total 3.76s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.49s, total 9.27s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    19 entries, avg 0.25s, total 4.78s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.33s, total 6.27s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    19 entries, avg 0.28s, total 5.23s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.26s, total 4.90s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    19 entries, avg 0.19s, total 3.63s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.34s, total 6.40s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.55s, total 10.49s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.44s, total 8.30s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.33s, total 6.36s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_full
+    19 entries, avg 0.37s, total 7.03s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_full
+    19 entries, avg 0.32s, total 6.07s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_full
+    19 entries, avg 0.35s, total 6.67s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_full
+    19 entries, avg 0.36s, total 6.89s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.52s, total 9.83s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    19 entries, avg 0.50s, total 9.59s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.62s, total 11.83s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    19 entries, avg 0.46s, total 8.69s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.62s, total 11.87s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    19 entries, avg 0.54s, total 10.25s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    19 entries, avg 0.52s, total 9.86s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    19 entries, avg 0.48s, total 9.11s
+
+=== Retrain times per epoch ===
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.63s, total 1123.97s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_full
+    89 entries, avg 12.89s, total 1147.35s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.65s, total 1126.16s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_full
+    89 entries, avg 12.84s, total 1143.13s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.65s, total 1126.29s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_full
+    89 entries, avg 12.89s, total 1147.52s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.61s, total 1122.68s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_full
+    89 entries, avg 12.47s, total 1109.55s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.45s, total 1196.86s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_full
+    89 entries, avg 12.56s, total 1118.28s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.60s, total 1210.71s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_full
+    89 entries, avg 12.66s, total 1126.74s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.66s, total 1216.12s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_full
+    89 entries, avg 12.63s, total 1124.04s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.72s, total 1221.32s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_full
+    89 entries, avg 12.65s, total 1126.14s
+  pr0.5_np11_kernel_Abilene_fixed_original_full
+    90 entries, avg 12.51s, total 1125.96s
+  pr0.75_np11_kernel_Abilene_fixed_original_full
+    90 entries, avg 12.81s, total 1153.02s
+  pr0.85_np11_kernel_Abilene_fixed_original_full
+    90 entries, avg 12.86s, total 1157.21s
+  pr1.0_np11_kernel_Abilene_fixed_original_full
+    90 entries, avg 12.83s, total 1154.87s
+  pr0.5_np11_kernel_Abilene_cost_fixed_original_full
+    90 entries, avg 12.48s, total 1122.98s
+  pr0.75_np11_kernel_Abilene_cost_fixed_original_full
+    90 entries, avg 12.72s, total 1144.40s
+  pr0.85_np11_kernel_Abilene_cost_fixed_original_full
+    90 entries, avg 12.68s, total 1141.25s
+  pr1.0_np11_kernel_Abilene_cost_fixed_original_full
+    90 entries, avg 12.62s, total 1135.89s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.70s, total 1219.70s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    89 entries, avg 13.48s, total 1199.63s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.82s, total 1230.36s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    89 entries, avg 13.67s, total 1216.83s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.82s, total 1229.98s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    89 entries, avg 13.72s, total 1221.10s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.80s, total 1227.89s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full
+    89 entries, avg 12.87s, total 1145.28s
+  pr0.5_np10_kernel_BarabasiAlbert_fixed_original_full
+    90 entries, avg 12.50s, total 1125.41s
+  pr0.75_np10_kernel_BarabasiAlbert_fixed_original_full
+    90 entries, avg 12.93s, total 1164.07s
+  pr0.85_np10_kernel_BarabasiAlbert_fixed_original_full
+    90 entries, avg 12.87s, total 1158.20s
+  pr1.0_np10_kernel_BarabasiAlbert_fixed_original_full
+    90 entries, avg 12.83s, total 1154.33s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.65s, total 1214.61s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    89 entries, avg 13.60s, total 1210.30s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.75s, total 1223.96s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    89 entries, avg 13.74s, total 1222.65s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.72s, total 1220.85s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    89 entries, avg 13.67s, total 1216.57s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.71s, total 1220.35s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full
+    89 entries, avg 12.51s, total 1113.64
+  pr0.5_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    90 entries, avg 12.54s, total 1128.82s
+  pr0.75_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    90 entries, avg 12.72s, total 1144.99s
+  pr0.85_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    90 entries, avg 12.70s, total 1142.69s
+  pr1.0_np10_kernel_BarabasiAlbert_cost_fixed_original_full
+    90 entries, avg 12.70s, total 1143.42s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.37s, total 1100.89s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    89 entries, avg 12.48s, total 1110.32s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.48s, total 1110.87s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    89 entries, avg 12.65s, total 1125.70s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.50s, total 1112.92s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    89 entries, avg 12.91s, total 1148.92s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.70s, total 1130.31s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_full
+    19 entries, avg 12.94s, total 245.87s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.56s, total 1207.01s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    89 entries, avg 12.36s, total 1100.01s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.75s, total 1223.31s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    89 entries, avg 12.49s, total 1111.42s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 13.73s, total 1221.78s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    89 entries, avg 12.40s, total 1103.78s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.59s, total 1120.50s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full
+    89 entries, avg 12.43s, total 1106.40s
+  pr0.5_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    90 entries, avg 12.40s, total 1115.61s
+  pr0.75_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    90 entries, avg 12.54s, total 1128.23s
+  pr0.85_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    90 entries, avg 12.45s, total 1120.44s
+  pr1.0_np10_kernel_WattsStrogatz_cost_fixed_original_full
+    90 entries, avg 12.46s, total 1121.31s
+  pr0.5_np10_kernel_WattsStrogatz_fixed_original_full
+    90 entries, avg 12.34s, total 1110.55s
+  pr0.75_np10_kernel_WattsStrogatz_fixed_original_full
+    90 entries, avg 12.70s, total 1143.33s
+  pr0.85_np10_kernel_WattsStrogatz_fixed_original_full
+    90 entries, avg 12.74s, total 1146.56s
+  pr1.0_np10_kernel_WattsStrogatz_fixed_original_full
+    90 entries, avg 12.41s, total 1117.07s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.72s, total 1131.76s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.86s, total 1144.28s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.96s, total 1153.16s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.37s, total 1101.06s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_full
+    89 entries, avg 12.69s, total 1129.19s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_full
+    89 entries, avg 12.83s, total 1142.11s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_full
+    89 entries, avg 12.58s, total 1119.60s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_full
+    89 entries, avg 12.72s, total 1132.02s
+  pr0.5_np68_kernel_Dtelekom_fixed_original_full
+    90 entries, avg 12.66s, total 1139.20s
+  pr0.75_np68_kernel_Dtelekom_fixed_original_full
+    90 entries, avg 13.17s, total 1185.13s
+  pr0.85_np68_kernel_Dtelekom_fixed_original_full
+    90 entries, avg 13.09s, total 1178.36s
+  pr1.0_np68_kernel_Dtelekom_fixed_original_full
+    90 entries, avg 12.95s, total 1165.16s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.50s, total 1112.30s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    89 entries, avg 12.72s, total 1132.18s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.99s, total 1155.88s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    89 entries, avg 12.88s, total 1146.75s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.90s, total 1147.69s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    89 entries, avg 12.80s, total 1138.94s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows
+    89 entries, avg 12.86s, total 1144.88s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full
+    89 entries, avg 12.43s, total 1106.55s
+  pr0.5_np68_kernel_Dtelekom_cost_fixed_original_full
+    90 entries, avg 12.72s, total 1144.39s
+  pr0.75_np68_kernel_Dtelekom_cost_fixed_original_full
+    90 entries, avg 13.06s, total 1175.33s
+  pr0.85_np68_kernel_Dtelekom_cost_fixed_original_full
+    90 entries, avg 13.06s, total 1175.36s
+  pr1.0_np68_kernel_Dtelekom_cost_fixed_original_full
+    90 entries, avg 12.89s, total 1160.44s
+
+
+=== Elapsed time at epoch 0 ===
+  pr0.0_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  3.7253s
+  pr0.0_np11_partition_row_Abilene_rsgn5_original_full  ->  3.0763s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  1.7018s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_full  ->  1.7054s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  1.8047s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_full  ->  1.8371s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  1.8600s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_full  ->  1.8084s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  1.8254s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_full  ->  3.2540s
+  pr0.0_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  3.3382s
+  pr0.0_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  3.3598s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  1.8159s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  1.8579s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  1.9806s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  1.7758s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  2.0220s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  1.7978s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  2.0129s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  3.3084s
+  pr0.0_np11_kernel_Abilene_fixed_original_full  ->  3.1069s
+  pr0.5_np11_kernel_Abilene_fixed_original_full  ->  1.5791s
+  pr0.75_np11_kernel_Abilene_fixed_original_full  ->  1.6376s
+  pr0.85_np11_kernel_Abilene_fixed_original_full  ->  1.7914s
+  pr1.0_np11_kernel_Abilene_fixed_original_full  ->  1.7926s
+  pr0.0_np11_kernel_Abilene_cost_fixed_original_full  ->  3.0900s
+  pr0.5_np11_kernel_Abilene_cost_fixed_original_full  ->  1.5774s
+  pr0.75_np11_kernel_Abilene_cost_fixed_original_full  ->  1.6422s
+  pr0.85_np11_kernel_Abilene_cost_fixed_original_full  ->  1.6596s
+  pr1.0_np11_kernel_Abilene_cost_fixed_original_full  ->  1.6719s
+  pr0.0_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  3.4763s
+  pr0.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  3.4996s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  1.8363s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  1.8616s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2.0884s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  1.9720s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2.0067s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  1.8659s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2.0324s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  3.2356s
+  pr0.0_np10_kernel_BarabasiAlbert_fixed_original_full  ->  3.0467s
+  pr0.5_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1.6140s
+  pr0.75_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1.6249s
+  pr0.85_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1.8145s
+  pr1.0_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1.7768s
+  pr0.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  3.7166s
+  pr0.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  3.5426s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  1.8093s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  1.8249s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  1.8525s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  1.9667s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  1.9916s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  1.9751s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  1.9645s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  1.9498s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  3.1342s
+  pr0.0_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  3.1357s
+  pr0.5_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1.5492s
+  pr0.75_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1.6841s
+  pr0.85_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1.7195s
+  pr1.0_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1.7881s
+  pr0.0_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  3.5034s
+  pr0.0_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  3.6246s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  1.7124s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  1.6493s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  1.8152s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  2.0356s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  1.9537s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  1.8221s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  1.8214s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  1.9194s
+  pr0.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  3.4327s
+  pr0.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  2.8802s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  1.8311s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  1.6640s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  1.9439s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  1.7592s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  2.2074s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  1.7768s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  2.0177s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  3.3158s
+  pr0.0_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  2.9803s
+  pr0.5_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1.5451s
+  pr0.75_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1.6233s
+  pr0.85_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1.6522s
+  pr1.0_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1.6798s
+  pr0.0_np10_kernel_WattsStrogatz_fixed_original_full  ->  2.9729s
+  pr0.5_np10_kernel_WattsStrogatz_fixed_original_full  ->  1.5137s
+  pr0.75_np10_kernel_WattsStrogatz_fixed_original_full  ->  1.6907s
+  pr0.85_np10_kernel_WattsStrogatz_fixed_original_full  ->  1.7219s
+  pr1.0_np10_kernel_WattsStrogatz_fixed_original_full  ->  1.7627s
+  pr0.0_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  3.5377s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2.0018s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2.0236s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2.0258s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  3.3546s
+  pr0.0_np68_partition_row_Dtelekom_rsgn5_original_full  ->  3.2195s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_full  ->  1.8833s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_full  ->  1.9937s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_full  ->  1.9826s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_full  ->  2.0083s
+  pr0.0_np68_kernel_Dtelekom_fixed_original_full  ->  3.3259s
+  pr0.5_np68_kernel_Dtelekom_fixed_original_full  ->  1.7495s
+  pr0.75_np68_kernel_Dtelekom_fixed_original_full  ->  1.7711s
+  pr0.85_np68_kernel_Dtelekom_fixed_original_full  ->  2.0189s
+  pr1.0_np68_kernel_Dtelekom_fixed_original_full  ->  1.9800s
+  pr0.0_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  3.1896s
+  pr0.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  3.2579s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  1.8011s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  1.8323s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  1.9375s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  1.9484s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  2.1301s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  1.9999s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  1.9812s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  3.4229s
+  pr0.0_np68_kernel_Dtelekom_cost_fixed_original_full  ->  3.1618s
+  pr0.5_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1.6573s
+  pr0.75_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1.7844s
+  pr0.85_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1.8251s
+  pr1.0_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1.8446s
+
+=== Elapsed time at epoch 100 ===
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  2520.5226s
+  pr0.5_np11_partition_row_Abilene_rsgn5_original_full  ->  2357.0112s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  2569.8173s
+  pr0.75_np11_partition_row_Abilene_rsgn5_original_full  ->  2406.1572s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  2574.4244s
+  pr0.85_np11_partition_row_Abilene_rsgn5_original_full  ->  2401.8417s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_aggregate_partition_rows  ->  2571.8237s
+  pr1.0_np11_partition_row_Abilene_rsgn5_original_full  ->  2289.7667s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  2695.6245s
+  pr0.5_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  2373.7805s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  2785.6088s
+  pr0.75_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  2363.1440s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  2789.2876s
+  pr0.85_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  2378.6514s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_aggregate_partition_rows  ->  2787.9781s
+  pr1.0_np11_partition_row_Abilene_cost_rsgn5_original_full  ->  2330.5902s
+  pr0.5_np11_kernel_Abilene_fixed_original_full  ->  1391.6252s
+  pr0.75_np11_kernel_Abilene_fixed_original_full  ->  1418.3698s
+  pr0.85_np11_kernel_Abilene_fixed_original_full  ->  1440.4570s
+  pr1.0_np11_kernel_Abilene_fixed_original_full  ->  1424.4182s
+  pr0.5_np11_kernel_Abilene_cost_fixed_original_full  ->  1403.7746s
+  pr0.75_np11_kernel_Abilene_cost_fixed_original_full  ->  1428.7933s
+  pr0.85_np11_kernel_Abilene_cost_fixed_original_full  ->  1431.3985s
+  pr1.0_np11_kernel_Abilene_cost_fixed_original_full  ->  1432.9196s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2733.0604s
+  pr0.5_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  2488.5956s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2803.3975s
+  pr0.75_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  2541.5305s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2804.3837s
+  pr0.85_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  2550.5425s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_aggregate_partition_rows  ->  2800.5904s
+  pr1.0_np10_partition_row_BarabasiAlbert_rsgn5_original_full  ->  2383.5555s
+  pr0.5_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1401.2978s
+  pr0.75_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1428.6650s
+  pr0.85_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1451.0134s
+  pr1.0_np10_kernel_BarabasiAlbert_fixed_original_full  ->  1442.6965s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  2697.2718s
+  pr0.5_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  2493.4966s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  2769.7770s
+  pr0.75_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  2545.8325s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  2776.1595s
+  pr0.85_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  2557.8841s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_aggregate_partition_rows  ->  2767.2827s
+  pr1.0_np10_partition_row_BarabasiAlbert_cost_rsgn5_original_full  ->  2317.4563s
+  pr0.5_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1397.1831s
+  pr0.75_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1420.9714s
+  pr0.85_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1430.9392s
+  pr1.0_np10_kernel_BarabasiAlbert_cost_fixed_original_full  ->  1431.3147s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  2480.4698s
+  pr0.5_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  2301.8423s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  2523.3269s
+  pr0.75_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  2353.5601s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  2525.8024s
+  pr0.85_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  2389.6627s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_aggregate_partition_rows  ->  2549.2157s
+  pr1.0_np10_partition_row_WattsStrogatz_rsgn5_original_full  ->  2425.3735s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  2702.3605s
+  pr0.5_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  2289.4529s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  2770.6083s
+  pr0.75_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  2322.6519s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  2781.8647s
+  pr0.85_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  2326.8042s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_aggregate_partition_rows  ->  2691.6728s
+  pr1.0_np10_partition_row_WattsStrogatz_cost_rsgn5_original_full  ->  2295.3452s
+  pr0.5_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1380.2309s
+  pr0.75_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1402.6729s
+  pr0.85_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1402.4650s
+  pr1.0_np10_kernel_WattsStrogatz_cost_fixed_original_full  ->  1402.4452s
+  pr0.5_np10_kernel_WattsStrogatz_fixed_original_full  ->  1399.0523s
+  pr0.75_np10_kernel_WattsStrogatz_fixed_original_full  ->  1404.7866s
+  pr0.85_np10_kernel_WattsStrogatz_fixed_original_full  ->  1446.4528s
+  pr1.0_np10_kernel_WattsStrogatz_fixed_original_full  ->  1423.6642s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2581.4498s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2617.7587s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2635.7763s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_aggregate_partition_rows  ->  2521.6303s
+  pr0.5_np68_partition_row_Dtelekom_rsgn5_original_full  ->  2357.2169s
+  pr0.75_np68_partition_row_Dtelekom_rsgn5_original_full  ->  2398.0864s
+  pr0.85_np68_partition_row_Dtelekom_rsgn5_original_full  ->  2402.6689s
+  pr1.0_np68_partition_row_Dtelekom_rsgn5_original_full  ->  2399.3641s
+  pr0.5_np68_kernel_Dtelekom_fixed_original_full  ->  1425.7281s
+  pr0.75_np68_kernel_Dtelekom_fixed_original_full  ->  1470.1249s
+  pr0.85_np68_kernel_Dtelekom_fixed_original_full  ->  1495.9936s
+  pr1.0_np68_kernel_Dtelekom_fixed_original_full  ->  1479.9475s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  2534.3189s
+  pr0.5_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  2355.1864s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  2645.4653s
+  pr0.75_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  2392.9703s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  2657.1381s
+  pr0.85_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  2407.7498s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_aggregate_partition_rows  ->  2645.0185s
+  pr1.0_np68_partition_row_Dtelekom_cost_rsgn5_original_full  ->  2339.0671s
+  pr0.5_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1418.9702s
+  pr0.75_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1465.2529s
+  pr0.85_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1478.9530s
+  pr1.0_np68_kernel_Dtelekom_cost_fixed_original_full  ->  1465.5186s
