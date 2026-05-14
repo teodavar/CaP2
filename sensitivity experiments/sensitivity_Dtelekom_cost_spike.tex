@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($k$ for single-link spike)}}\\
+\cline{2-5}
+& $k$=1 & $k$=2 & $k$=5 & $k$=10\\
+\midrule
+\Problemname-frozen ($\penbr$) & 1.11e+08 & 1.11e+08 & 1.11e+08 & 1.11e+08\\
+\Problemname-frozen ($\pencr$) & 1.09e+08 & 1.09e+08 & 1.09e+08 & 1.10e+08\\
+\Baseline-frozen & 2.12e+08 & 2.12e+08 & 2.12e+08 & 2.13e+08\\
+\method{Dense}-frozen & 2.08e+08 & 2.08e+08 & 2.08e+08 & 2.08e+08\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under spike perturbations of $\C$
+at deployment, for the \emph{Dtelekom_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($k$=1) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_Dtelekom_cost_spike}
+\end{table}

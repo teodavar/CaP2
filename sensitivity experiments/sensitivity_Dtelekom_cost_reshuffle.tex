@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($p$ for speed-class reshuffle)}}\\
+\cline{2-5}
+& $p$=0.0 & $p$=0.1 & $p$=0.25 & $p$=0.5\\
+\midrule
+\Problemname-frozen ($\penbr$) & 1.11e+08 & 1.10e+08 & 1.10e+08 & 1.09e+08\\
+\Problemname-frozen ($\pencr$) & 1.09e+08 & 1.09e+08 & 1.09e+08 & 1.09e+08\\
+\Baseline-frozen & 2.12e+08 & 2.09e+08 & 2.07e+08 & 2.03e+08\\
+\method{Dense}-frozen & 2.08e+08 & 2.07e+08 & 2.09e+08 & 2.08e+08\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under reshuffle perturbations of $\C$
+at deployment, for the \emph{Dtelekom_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($p$=0.0) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_Dtelekom_cost_reshuffle}
+\end{table}

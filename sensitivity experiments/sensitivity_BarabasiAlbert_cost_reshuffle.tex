@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($p$ for speed-class reshuffle)}}\\
+\cline{2-5}
+& $p$=0.0 & $p$=0.1 & $p$=0.25 & $p$=0.5\\
+\midrule
+\Problemname-frozen ($\penbr$) & 2.15e+07 & 1.90e+07 & 1.92e+07 & 1.77e+07\\
+\Problemname-frozen ($\pencr$) & 1.37e+07 & 1.36e+07 & 1.34e+07 & 1.33e+07\\
+\Baseline-frozen & 4.65e+07 & 4.43e+07 & 4.33e+07 & 4.16e+07\\
+\method{Dense}-frozen & 4.56e+06 & 4.48e+06 & 4.35e+06 & 4.29e+06\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under reshuffle perturbations of $\C$
+at deployment, for the \emph{BarabasiAlbert_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($p$=0.0) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_BarabasiAlbert_cost_reshuffle}
+\end{table}

@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{Method} & \multicolumn{5}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($\sigma$ for log-normal noise)}}\\
+\cline{2-6}
+& $\sigma$=0.0 & $\sigma$=0.1 & $\sigma$=0.25 & $\sigma$=0.5 & $\sigma$=1.0\\
+\midrule
+\Problemname-frozen ($\penbr$) & 2.15e+07 & 2.14e+07 & 2.20e+07 & 2.43e+07 & 3.30e+07\\
+\Problemname-frozen ($\pencr$) & 1.37e+07 & 1.38e+07 & 1.40e+07 & 1.51e+07 & 2.12e+07\\
+\Baseline-frozen & 4.65e+07 & 4.65e+07 & 4.80e+07 & 5.36e+07 & 7.53e+07\\
+\method{Dense}-frozen & 4.56e+06 & 4.56e+06 & 4.70e+06 & 5.22e+06 & 7.31e+06\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under lognormal perturbations of $\C$
+at deployment, for the \emph{BarabasiAlbert_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($\sigma$=0.0) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_BarabasiAlbert_cost_lognormal}
+\end{table}

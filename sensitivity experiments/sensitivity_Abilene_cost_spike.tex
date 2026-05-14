@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($k$ for single-link spike)}}\\
+\cline{2-5}
+& $k$=1 & $k$=2 & $k$=5 & $k$=10\\
+\midrule
+\Problemname-frozen ($\penbr$) & 3.56e+07 & 3.63e+07 & 3.87e+07 & 4.51e+07\\
+\Problemname-frozen ($\pencr$) & 2.37e+07 & 2.42e+07 & 2.56e+07 & 2.85e+07\\
+\Baseline-frozen & 8.09e+07 & 8.24e+07 & 8.91e+07 & 9.85e+07\\
+\method{Dense}-frozen & 8.77e+06 & 8.93e+06 & 9.59e+06 & 1.05e+07\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under spike perturbations of $\C$
+at deployment, for the \emph{Abilene_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($k$=1) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_Abilene_cost_spike}
+\end{table}

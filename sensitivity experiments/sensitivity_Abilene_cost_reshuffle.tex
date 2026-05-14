@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($p$ for speed-class reshuffle)}}\\
+\cline{2-5}
+& $p$=0.0 & $p$=0.1 & $p$=0.25 & $p$=0.5\\
+\midrule
+\Problemname-frozen ($\penbr$) & 3.56e+07 & 3.37e+07 & 3.12e+07 & 2.52e+07\\
+\Problemname-frozen ($\pencr$) & 2.37e+07 & 2.42e+07 & 2.32e+07 & 2.14e+07\\
+\Baseline-frozen & 8.09e+07 & 7.83e+07 & 7.09e+07 & 6.23e+07\\
+\method{Dense}-frozen & 8.77e+06 & 8.79e+06 & 8.21e+06 & 7.72e+06\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under reshuffle perturbations of $\C$
+at deployment, for the \emph{Abilene_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($p$=0.0) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_Abilene_cost_reshuffle}
+\end{table}

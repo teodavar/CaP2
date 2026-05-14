@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($k$ for single-link spike)}}\\
+\cline{2-5}
+& $k$=1 & $k$=2 & $k$=5 & $k$=10\\
+\midrule
+\Problemname-frozen ($\penbr$) & 2.15e+07 & 2.21e+07 & 2.27e+07 & 2.45e+07\\
+\Problemname-frozen ($\pencr$) & 1.37e+07 & 1.40e+07 & 1.48e+07 & 1.59e+07\\
+\Baseline-frozen & 4.65e+07 & 4.77e+07 & 4.94e+07 & 5.34e+07\\
+\method{Dense}-frozen & 4.56e+06 & 4.67e+06 & 4.88e+06 & 5.29e+06\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under spike perturbations of $\C$
+at deployment, for the \emph{BarabasiAlbert_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($k$=1) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_BarabasiAlbert_cost_spike}
+\end{table}

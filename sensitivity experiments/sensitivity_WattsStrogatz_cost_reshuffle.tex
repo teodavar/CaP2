@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|cccc}
+\toprule
+\textbf{Method} & \multicolumn{4}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($p$ for speed-class reshuffle)}}\\
+\cline{2-5}
+& $p$=0.0 & $p$=0.1 & $p$=0.25 & $p$=0.5\\
+\midrule
+\Problemname-frozen ($\penbr$) & 1.52e+07 & 1.47e+07 & 1.47e+07 & 1.44e+07\\
+\Problemname-frozen ($\pencr$) & 1.31e+07 & 1.30e+07 & 1.29e+07 & 1.33e+07\\
+\Baseline-frozen & 4.65e+07 & 4.45e+07 & 4.39e+07 & 4.29e+07\\
+\method{Dense}-frozen & 4.42e+06 & 4.29e+06 & 4.26e+06 & 4.30e+06\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under reshuffle perturbations of $\C$
+at deployment, for the \emph{WattsStrogatz_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($p$=0.0) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_WattsStrogatz_cost_reshuffle}
+\end{table}

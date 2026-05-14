@@ -1,0 +1,22 @@
+\begin{table}[t]
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|ccccc}
+\toprule
+\textbf{Method} & \multicolumn{5}{c}{\textbf{Realized Comm.~Cost under $\C'$ ($\sigma$ for log-normal noise)}}\\
+\cline{2-6}
+& $\sigma$=0.0 & $\sigma$=0.1 & $\sigma$=0.25 & $\sigma$=0.5 & $\sigma$=1.0\\
+\midrule
+\Problemname-frozen ($\penbr$) & 3.56e+07 & 3.56e+07 & 3.72e+07 & 4.04e+07 & 5.22e+07\\
+\Problemname-frozen ($\pencr$) & 2.37e+07 & 2.38e+07 & 2.42e+07 & 2.71e+07 & 3.58e+07\\
+\Baseline-frozen & 8.09e+07 & 8.10e+07 & 8.39e+07 & 9.39e+07 & 1.23e+08\\
+\method{Dense}-frozen & 8.77e+06 & 8.79e+06 & 9.07e+06 & 1.02e+07 & 1.37e+07\\
+\bottomrule
+\end{tabular}
+}
+\caption{Realized communication cost under lognormal perturbations of $\C$
+at deployment, for the \emph{Abilene_cost} topology with $\text{pr}=0.75$.
+The leftmost column ($\sigma$=0.0) is the no-perturbation
+baseline ($\C'=\C$). Values averaged over 10 perturbation draws.}
+\label{tab:sensitivity_Abilene_cost_lognormal}
+\end{table}

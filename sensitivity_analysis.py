@@ -2,60 +2,62 @@ r"""
 sensitivity_analysis.py
 =======================
 
-Fills in the Table from `dynamic-1-sensitivity.tex` (Sec. "Robustness to
-Communication-Cost Variation") of the J_CaMP paper.
+Generates the per-topology robustness plot for `dynamic-1-sensitivity.tex`
+(Sec. "Robustness to Communication-Cost Variation") of the J_CaMP paper.
 
-What the table reports
-----------------------
-For each perturbation family, the *realized* communication cost (\penc with
-E^hrd) when the deployment-time cost matrix C is replaced by a perturbed
-matrix C'. Five rows in the draft table:
+What the plot shows
+-------------------
+One plot per topology. Each curve is the relative growth of realized
+communication cost,
 
-    - CaMP-frozen (\penbr) = CaMP trained with the TCC penalty, evaluated on C'
-    - CaMP-frozen (\pencr) = CaMP trained with the AOP penalty, evaluated on C'
-    - CaP-frozen           = baseline trained for C, evaluated on C'
-    - Dense-frozen         = no pruning, evaluated on C'
-    - CaMP-C' oracle       = full ADMM re-run from scratch with C' as input
+    y(sigma) = cost(C') / cost(C) - 1
 
-The two CaMP-frozen rows are different *models* (TCC- and AOP-trained per
-J_CaMP Sec. 5), both evaluated with the same realized-cost metric on C'.
+(so every curve starts at 0 at sigma=0 and grows), versus the relative
+noise scale sigma swept over a dense grid spanning small "graceful
+degradation" values and large "stress test" values on a symmetric-log
+x-axis. Curves compared:
 
-Three perturbation families (each gets one table; baseline column added):
+    - CaMP-frozen (TCC penalty / \penbr)
+    - CaMP-frozen (AOP penalty / \pencr)
+    - CaP-frozen   (baseline)
+    - Dense-frozen (no pruning)
+    - CaMP-C' oracle  (optional, drawn if oracle artifacts are on disk)
 
-    1. Multiplicative log-normal noise    σ ∈ {0, 0.1, 0.25, 0.5, 1.0}
-       (σ=0 ⇒ C'=C, baseline / sanity check)
-    2. Speed-class reshuffle              p ∈ {0, 0.1, 0.25, 0.5}
-    3. Single-link spike                   k ∈ {1, 2, 5, 10}
+Perturbation model (debiased multiplicative log-normal, zero-mean noise)
+------------------------------------------------------------------------
+For each off-diagonal entry of C,
 
-Why training is also perturbed (the oracle)
--------------------------------------------
-Per the paper (Sec. 4-methodology and Alg.~ADMM), training takes C as input
-to the penalty term and produces both weights W* and a placement M*. The
-oracle row is therefore not a re-evaluation of the same model under C', but
-a *new* model produced by re-running the full optimization with C'
-substituted everywhere C appears -- inside the SGD primary update, inside
-the greedy assignment subproblem, etc. This script wires that retraining
-through `MoP.prune()` + `MoP.finetune()`.
+    C'[i,j] = C[i,j] * exp(eta - sigma_log^2 / 2),
+    eta ~ N(0, sigma_log^2),  sigma_log = sqrt(log(1 + sigma^2))
+
+is calibrated so that *exactly*:
+
+    E[C'[i,j]]               = C[i,j]      (zero-mean noise)
+    Std(C'[i,j]) / C[i,j]    = sigma       (target relative std)
+
+C'[i,j] > 0 always, so no clipping or thresholding is needed. The other
+two perturbation families (speed-class reshuffle, single-link spike)
+have been dropped per the scope agreed for the appendix.
 
 Modes
 -----
-    eval          : only evaluate (CaMP-frozen, CaP-frozen, Dense-frozen).
+    eval          : only evaluate the frozen models on each perturbed C'.
                     Oracles loaded from disk if --oracle_root points at
-                    completed retrains; missing oracle cells become "--".
-                    Cheap. Default.
-    train_oracles : for each (ptype, level, draw), retrain CaMP from scratch
-                    with the perturbed C' as input, save to
-                    <oracle_root>/<ptype>_<param><val>/<draw>/. Expensive.
+                    completed retrains; missing oracle cells become NaN.
+                    Default; cheap.
+    train_oracles : for each (sigma, draw), retrain CaMP from scratch
+                    with C' as input, save to
+                    <oracle_root>/lognormal_sigma<val>/<draw>/. Expensive.
                     Requires --config (the base training YAML).
     all           : train_oracles, then eval.
 
-The eval pass and the train_oracles pass use the SAME C' for the same
-(ptype, level, draw) tuple, via a deterministic per-cell seed derived from
+The eval and train_oracles passes use the SAME C' for the same
+(sigma, draw) tuple, via a deterministic per-cell seed derived from
 --seed. Reproducible across reruns.
 
 Usage
 -----
-    # cheap: just make the table from already-trained artifacts
+    # cheap: just make the plot from already-trained artifacts
     python sensitivity_analysis.py \
         --mode eval                                       \
         --camp_tcc_dir <path>/<CaMP_TCC_run_folder>       \
@@ -63,7 +65,6 @@ Usage
         --cap_dir      <path>/<CaP_run_folder>            \
         --topology Dtelekom                               \
         --pr 0.75 --n_draws 10                            \
-        --oracle_root  oracle_runs/Dtelekom_pr0.75        \   # optional
         --out_dir sensitivity_out
 
     # expensive: actually train the oracles in-process
@@ -88,6 +89,10 @@ import torch
 import torch.nn as nn
 import yaml
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 # Make CaP2 importable when this script is run from anywhere
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
@@ -105,75 +110,39 @@ from pareto import (
 # ── perturbation families ────────────────────────────────────────────────────
 
 def perturb_lognormal(maps, sigma, rng):
-    """C'[i,j] = C[i,j] * exp(N(0, sigma^2)) for i != j. σ=0 ⇒ identity."""
+    """Debiased multiplicative log-normal perturbation calibrated so that
+    sigma is the *relative standard deviation* of C':
+        E[C'[i,j]]                = C[i,j]              (zero-mean noise)
+        Std(C'[i,j]) / C[i,j]     = sigma               (target rel. std)
+
+    Implemented as C'[i,j] = C[i,j] * exp(eta - sigma_log^2/2), with
+    eta ~ N(0, sigma_log^2) and sigma_log = sqrt(log(1 + sigma^2)). C' is
+    strictly positive (no clipping). Diagonal is zeroed. sigma=0 ⇒ identity.
+    """
     if sigma == 0:
         return [list(row) for row in maps]
     C = np.asarray(maps, dtype=float).copy()
     n = C.shape[0]
-    noise = rng.normal(0.0, sigma, size=(n, n))
+    sigma_log = np.sqrt(np.log(1.0 + sigma ** 2))
+    noise = rng.normal(0.0, sigma_log, size=(n, n))
     np.fill_diagonal(noise, 0.0)
-    C = C * np.exp(noise)
+    C = C * np.exp(noise - 0.5 * sigma_log ** 2)
     np.fill_diagonal(C, 0.0)
     return C.tolist()
 
 
-def perturb_speed_class_reshuffle(maps, p, rng):
-    """
-    Approximate "redraw the speed class of fraction p of machines" by
-    permuting their row+column blocks with another randomly chosen machine.
-    p=0 ⇒ identity.
-
-    The codebase does not store an explicit speed-class assignment per
-    machine (it's used transiently to construct C and then discarded -- see
-    J_CaMP paper Sec. 5, line ~113). This row+column swap is the closest
-    in-distribution approximation: each affected machine inherits another
-    machine's connectivity profile.
-    """
-    if p == 0:
-        return [list(row) for row in maps]
-    C = np.asarray(maps, dtype=float).copy()
-    n = C.shape[0]
-    n_reshuffle = max(1, int(round(p * n)))
-    affected = rng.choice(n, size=n_reshuffle, replace=False)
-    donors = rng.integers(0, n, size=n_reshuffle)
-    new_C = C.copy()
-    for m, donor in zip(affected, donors):
-        if donor == m:
-            continue
-        new_C[m, :] = C[donor, :]
-        new_C[:, m] = C[:, donor]
-    np.fill_diagonal(new_C, 0.0)
-    return new_C.tolist()
-
-
-def perturb_single_link_spike(maps, k, rng):
-    """Pick one random off-diagonal entry (i,j), multiply C[i,j] *and*
-    C[j,i] by k. k=1 ⇒ identity."""
-    if k == 1:
-        return [list(row) for row in maps]
-    C = np.asarray(maps, dtype=float).copy()
-    n = C.shape[0]
-    off_diag = [(i, j) for i in range(n) for j in range(n) if i != j]
-    idx = int(rng.integers(0, len(off_diag)))
-    i, j = off_diag[idx]
-    C[i, j] *= k
-    C[j, i] *= k
-    return C.tolist()
-
+# Dense sigma grid. Heavier near zero (the "graceful degradation" regime
+# we care about) and progressively sparser at the tail. sigma=0 is the
+# no-perturbation baseline. Combined with x-axis symlog this covers the
+# small- and large-noise regions in one readable plot.
+SIGMA_LEVELS = [0.0, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25, 0.35, 0.5, 0.75,
+                1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0]
 
 PERTURBATIONS = {
-    "lognormal":  {"levels": [0.0, 0.1, 0.25, 0.5, 1.0],
+    "lognormal":  {"levels":     SIGMA_LEVELS,
                    "param_name": "sigma",
                    "baseline":   0.0,
-                   "fn": perturb_lognormal},
-    "reshuffle":  {"levels": [0.0, 0.1, 0.25, 0.5],
-                   "param_name": "p",
-                   "baseline":   0.0,
-                   "fn": perturb_speed_class_reshuffle},
-    "spike":      {"levels": [1, 2, 5, 10],
-                   "param_name": "k",
-                   "baseline":   1,
-                   "fn": perturb_single_link_spike},
+                   "fn":         perturb_lognormal},
 }
 
 
@@ -328,7 +297,8 @@ def run_eval(args):
                                            args.num_classes, args.device)
 
     rows = []
-    for ptype, spec in PERTURBATIONS.items():
+    for ptype in args.perturbations:
+        spec = PERTURBATIONS[ptype]
         for level in spec["levels"]:
             for draw in range(args.n_draws):
                 new_maps = sample_C_prime(ptype, level, draw, base_maps,
@@ -496,7 +466,8 @@ def run_train_oracles(args):
 
     n_planned = 0
     n_done    = 0
-    for ptype, spec in PERTURBATIONS.items():
+    for ptype in args.perturbations:
+        spec = PERTURBATIONS[ptype]
         for level in spec["levels"]:
             if is_baseline(ptype, level):
                 continue
@@ -514,7 +485,7 @@ def run_train_oracles(args):
     print(f"\nOracle training complete: {n_done}/{n_planned} runs succeeded.")
 
 
-# ── output: CSV + LaTeX ──────────────────────────────────────────────────────
+# ── output: CSV + per-topology plot ──────────────────────────────────────────
 
 def emit_csv(df, out_dir, topology):
     path = os.path.join(out_dir, f"sensitivity_{topology}.csv")
@@ -523,85 +494,75 @@ def emit_csv(df, out_dir, topology):
 
 
 def _agg(df, ptype, method):
+    """Aggregate mean/std/count over draws for one (ptype, method)."""
     sub = df[(df.perturbation == ptype) & (df.method == method)]
-    return sub.groupby("param")["value"].mean()
+    return sub.groupby("param")["value"].agg(["mean", "std", "count"])
 
 
-def _fmt(x):
-    if x is None or (isinstance(x, float) and np.isnan(x)):
-        return "--"
-    if abs(x) >= 1e5:
-        return f"{x:.2e}"
-    if abs(x) >= 100:
-        return f"{x:.0f}"
-    return f"{x:.2f}"
+# Curves to draw, in the order they appear in the legend. Tuple is
+# (method-name-in-df, legend-label, color, marker).
+PLOT_METHODS = [
+    ("CaMP-frozen-TCC",    r"\textsc{CaMP}-frozen (TCC)",      "tab:blue",   "o"),
+    ("CaMP-frozen-AOP",    r"\textsc{CaMP}-frozen (AOP)",      "tab:orange", "s"),
+    ("CaP-frozen",         r"\textsc{CaP}-frozen (baseline)",  "tab:green",  "^"),
+    ("Dense-frozen",       r"Dense-frozen",                    "tab:red",    "D"),
+    ("CaMP-Cprime-oracle", r"\textsc{CaMP}-$C'$ (oracle)",     "tab:purple", "v"),
+]
 
 
-PERT_HEADERS = {
-    "lognormal": ("Realized Comm.~Cost under $\\C'$ ($\\sigma$ for log-normal noise)",
-                  "$\\sigma$"),
-    "reshuffle": ("Realized Comm.~Cost under $\\C'$ ($p$ for speed-class reshuffle)",
-                  "$p$"),
-    "spike":     ("Realized Comm.~Cost under $\\C'$ ($k$ for single-link spike)",
-                  "$k$"),
-}
+def emit_plot(df, out_dir, topology, ptype, pr, n_draws):
+    """One PDF + PNG per topology: relative growth of realized comm. cost
+    vs noise scale sigma. Curves are normalized so that every method
+    starts at 0 at sigma=0 and grows. Shaded band = mean +/- SE over the
+    n_draws perturbation samples. X-axis is symmetric-log (linear near 0,
+    log thereafter) so sigma=0 is visible alongside large-sigma stress
+    points in one figure; y-axis is symlog for the same reason (relative
+    growth spans many orders of magnitude across the sigma sweep).
+    """
+    fig, ax = plt.subplots(figsize=(6.0, 4.2))
 
+    drawn = 0
+    for method_key, label, color, marker in PLOT_METHODS:
+        agg = _agg(df, ptype, method_key)
+        if agg.empty or 0.0 not in agg.index:
+            continue
+        baseline = float(agg.loc[0.0, "mean"])
+        if not np.isfinite(baseline) or baseline <= 0:
+            continue
+        agg = agg.sort_index()
+        sigmas = agg.index.to_numpy(dtype=float)
+        rel = (agg["mean"].to_numpy(dtype=float) - baseline) / baseline
+        n_eff = np.maximum(agg["count"].to_numpy(dtype=float), 1.0)
+        std = np.nan_to_num(agg["std"].to_numpy(dtype=float), nan=0.0)
+        se = (std / np.sqrt(n_eff)) / baseline
+        ax.plot(sigmas, rel, color=color, marker=marker, markersize=4.5,
+                linewidth=1.6, label=label)
+        ax.fill_between(sigmas, rel - se, rel + se,
+                        color=color, alpha=0.15, linewidth=0)
+        drawn += 1
 
-def emit_latex(df, out_dir, topology, ptype, pr, n_draws):
-    spec = PERTURBATIONS[ptype]
-    levels = spec["levels"]
-    header_top, header_unit = PERT_HEADERS[ptype]
+    if drawn == 0:
+        plt.close(fig)
+        print(f"  Plot  -> (skipped: no data for {topology})")
+        return
 
-    camp_tcc = _agg(df, ptype, "CaMP-frozen-TCC")
-    camp_aop = _agg(df, ptype, "CaMP-frozen-AOP")
-    cap      = _agg(df, ptype, "CaP-frozen")
-    dense    = _agg(df, ptype, "Dense-frozen")
-    has_oracle = (df["method"] == "CaMP-Cprime-oracle").any()
-    oracle   = _agg(df, ptype, "CaMP-Cprime-oracle") if has_oracle else None
+    ax.set_xscale("symlog", linthresh=0.05)
+    ax.set_yscale("symlog", linthresh=0.1)
+    ax.axhline(0.0, color="black", linewidth=0.6)
+    ax.set_xlabel(r"Noise scale $\sigma$ (relative std of $C'$)")
+    ax.set_ylabel(r"$\mathrm{cost}(C')/\mathrm{cost}(C) - 1$")
+    ax.set_title(f"{topology}  (pr={pr}, {n_draws} draws/level)")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend(loc="upper left", fontsize=8, frameon=True)
+    fig.tight_layout()
 
-    def row(label, series):
-        cells = " & ".join(_fmt(series.get(lv, np.nan)) for lv in levels)
-        return f"{label} & {cells}\\\\"
-
-    n_cols = len(levels)
-    col_spec = "l|" + "c" * n_cols
-    header_cells = " & ".join(f"{header_unit}={lv}" for lv in levels)
-
-    body_lines = [
-        row("\\Problemname-frozen ($\\penbr$)", camp_tcc),
-        row("\\Problemname-frozen ($\\pencr$)", camp_aop),
-        row("\\Baseline-frozen",                cap),
-        row("\\method{Dense}-frozen",           dense),
-    ]
-    if oracle is not None:
-        body_lines.append("\\midrule")
-        body_lines.append(row("\\Problemname-$\\C'$ \\emph{(oracle)}", oracle))
-    body = "\n".join(body_lines)
-
-    tex = f"""\\begin{{table}}[t]
-\\centering
-\\resizebox{{\\columnwidth}}{{!}}{{%
-\\begin{{tabular}}{{{col_spec}}}
-\\toprule
-\\textbf{{Method}} & \\multicolumn{{{n_cols}}}{{c}}{{\\textbf{{{header_top}}}}}\\\\
-\\cline{{2-{n_cols + 1}}}
-& {header_cells}\\\\
-\\midrule
-{body}
-\\bottomrule
-\\end{{tabular}}
-}}
-\\caption{{Realized communication cost under {ptype} perturbations of $\\C$
-at deployment, for the \\emph{{{topology}}} topology with $\\text{{pr}}={pr}$.
-The leftmost column ({header_unit}={spec['baseline']}) is the no-perturbation
-baseline ($\\C'=\\C$). Values averaged over {n_draws} perturbation draws.}}
-\\label{{tab:sensitivity_{topology}_{ptype}}}
-\\end{{table}}
-"""
-    path = os.path.join(out_dir, f"sensitivity_{topology}_{ptype}.tex")
-    with open(path, "w") as f:
-        f.write(tex)
-    print(f"  LaTeX -> {path}")
+    pdf_path = os.path.join(out_dir, f"sensitivity_{topology}.pdf")
+    png_path = os.path.join(out_dir, f"sensitivity_{topology}.png")
+    fig.savefig(pdf_path)
+    fig.savefig(png_path, dpi=150)
+    plt.close(fig)
+    print(f"  Plot  -> {pdf_path}")
+    print(f"  Plot  -> {png_path}")
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────
@@ -637,6 +598,12 @@ def main():
                    help="Override the topology partition YAML path. Default "
                         "is inferred from the training config.")
 
+    p.add_argument("--perturbations", default="lognormal",
+                   help="Comma-separated subset of perturbation families to "
+                        "run. Only 'lognormal' (debiased zero-mean) is "
+                        "registered; the speed-class-reshuffle and "
+                        "single-link-spike families were dropped per the "
+                        "agreed appendix scope.")
     p.add_argument("--topology",  required=True,
                    help="Topology name for output labelling (e.g. Dtelekom).")
     p.add_argument("--pr",        type=float, default=0.75)
@@ -647,6 +614,17 @@ def main():
     p.add_argument("--num_classes", type=int, default=100)
     p.add_argument("--out_dir",   default="sensitivity_out")
     args = p.parse_args()
+
+    # Normalize --perturbations into a validated list, preserving CLI order.
+    requested = [s.strip() for s in args.perturbations.split(",") if s.strip()]
+    unknown = [name for name in requested if name not in PERTURBATIONS]
+    if unknown:
+        raise SystemExit(
+            f"Unknown perturbation(s): {unknown}. "
+            f"Valid choices: {list(PERTURBATIONS)}")
+    if not requested:
+        raise SystemExit("--perturbations cannot be empty.")
+    args.perturbations = requested
 
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -669,9 +647,9 @@ def main():
             raise SystemExit(f"{', '.join(missing)} required for --mode eval/all.")
         df = run_eval(args)
         emit_csv(df, args.out_dir, args.topology)
-        for ptype in PERTURBATIONS:
-            emit_latex(df, args.out_dir, args.topology, ptype,
-                       args.pr, args.n_draws)
+        for ptype in args.perturbations:
+            emit_plot(df, args.out_dir, args.topology, ptype,
+                      args.pr, args.n_draws)
 
 
 if __name__ == "__main__":
