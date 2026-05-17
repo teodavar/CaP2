@@ -5,23 +5,38 @@ sensitivity_analysis.py
 Generates the per-topology robustness plot for `dynamic-1-sensitivity.tex`
 (Sec. "Robustness to Communication-Cost Variation") of the J_CaMP paper.
 
-What the plot shows
+What the plots show
 -------------------
-One plot per topology. Each curve is the relative growth of realized
-communication cost,
+Two plots per topology, one per dispersion statistic, each comparing
+methods on a log-sigma axis. The MEAN relative growth is NOT plotted:
+the debiased perturbation has E[cost(C')] = cost(C) by construction
+(cost is linear in C'), so the empirical mean is an unbiased estimator
+of *zero* growth and the only signal is sampling noise. The honest
+robustness question is "how much does the realized cost VARY around its
+training-time value?", which is what std and MAD measure. Files emitted
+per topology T:
 
-    y(sigma) = cost(C') / cost(C) - 1
+    sensitivity_T_std.pdf  : y = Std(cost(C')) / cost(C)        (relative std)
+    sensitivity_T_mad.pdf  : y = E[|cost(C') - cost(C)|] / cost(C)  (relative MAD)
 
-(so every curve starts at 0 at sigma=0 and grows), versus the relative
-noise scale sigma swept over a dense grid spanning small "graceful
-degradation" values and large "stress test" values on a symmetric-log
-x-axis. Curves compared:
+Both start at 0 at sigma=0 and grow monotonically. Curves compared:
 
     - CaMP-frozen (TCC penalty / \penbr)
     - CaMP-frozen (AOP penalty / \pencr)
     - CaP-frozen   (baseline)
     - Dense-frozen (no pruning)
     - CaMP-C' oracle  (optional, drawn if oracle artifacts are on disk)
+
+Each method's curve has TWO renderings: empirical (solid line + markers,
+from n_draws independent perturbations of C) and analytical (dashed
+line, same color), where the analytical curve is closed-form for std
+and fast iid Monte Carlo on the log-normal multipliers for MAD. The
+analytical lines exist because cost(C') is linear in C' for a frozen
+model: with X_(i,n) = (active comm. weight) * C[i,n],
+    Var(cost(C')) = sigma^2 * sum X^2
+    => Std/cost(C) = sigma * sqrt(sum X^2) / sum X,
+and MAD has no closed form but can be Monte-Carloed cheaply from the
+(active_weights, C, sigma) triple alone.
 
 Perturbation model (debiased multiplicative log-normal, zero-mean noise)
 ------------------------------------------------------------------------
@@ -234,6 +249,140 @@ def dense_comm_cost(partition):
     return total
 
 
+# ── analytical relative-moment computation ───────────────────────────────────
+# Because the realized cost is linear in C',
+#
+#   cost(C')  =  sum_(i,n)  w_(i,n) * C'_(i,n)
+#
+# with the per-pair weight w_(i,n) determined entirely by the frozen model
+# and partition, the relative standard deviation and relative mean absolute
+# deviation of cost(C') under the debiased zero-mean log-normal perturbation
+# can be computed without any further frozen-model evaluations: only the
+# (one-time) per-(i,n) weights and the cost matrix C are needed. The
+# closed-form std follows from independence of L_(i,n); MAD has no closed
+# form but is exact under fast iid Monte Carlo on the L_(i,n) multipliers.
+
+def extract_active_weights_model(model, partition):
+    """Per-(i,n) communication weight for a frozen model. Mirrors
+    compute_communication_cost_and_kbits exactly, so
+        sum_(i,n) weight[(i,n)] * C[i,n]  ==  cost(C)
+    holds with whatever (model, partition) yielded the empirical cost.
+    """
+    weights = {}
+    if not partition or "num" not in partition or "maps" not in partition:
+        return weights
+    num_machines = partition["num"]
+    for name, W in model.named_parameters():
+        if name not in partition:
+            continue
+        weight = W.cpu().detach().numpy()
+        shape = weight.shape
+        is_conv = (len(shape) == 4)
+        layer_partition = partition[name]
+        outsize = layer_partition.get("outsize", 1) or 1
+        parents = layer_partition.get("parents", [])
+        if not parents:
+            continue
+        if is_conv:
+            W_flat = np.sum(np.abs(weight.reshape(shape[0], shape[1], -1)),
+                            axis=2)
+        else:
+            W_flat = np.abs(weight)
+        for n in range(num_machines):
+            for C_out in layer_partition["filter_id"][n]:
+                for i in range(num_machines):
+                    if i == n:
+                        continue
+                    if len(parents) == 1:
+                        input_channels = partition[parents[0]]["filter_id"][i]
+                    else:
+                        input_channels = np.concatenate(
+                            [partition[p]["filter_id"][i] for p in parents])
+                        input_channels = np.unique(input_channels)
+                    if (len(input_channels) > 0
+                            and np.any(W_flat[C_out, input_channels])):
+                        weights[(i, n)] = weights.get((i, n), 0.0) + outsize
+    return weights
+
+
+def extract_active_weights_dense(partition):
+    """Per-(i,n) weight matching the analytic dense_comm_cost formula.
+    Used when no dense checkpoint is provided -- consistent with the
+    empirical dense baseline so analytical and empirical lines overlap.
+    """
+    weights = {}
+    if not partition or "num" not in partition or "maps" not in partition:
+        return weights
+    num_machines = partition["num"]
+    for layer_partition in partition.values():
+        if not isinstance(layer_partition, dict):
+            continue
+        if "filter_id" not in layer_partition:
+            continue
+        parents = layer_partition.get("parents", [])
+        if not parents:
+            continue
+        outsize = layer_partition.get("outsize", 1) or 1
+        for n in range(num_machines):
+            if len(layer_partition["filter_id"][n]) == 0:
+                continue
+            for i in range(num_machines):
+                if i == n:
+                    continue
+                if len(parents) == 1:
+                    in_chans = partition[parents[0]]["filter_id"][i]
+                else:
+                    in_chans = np.concatenate(
+                        [partition[p]["filter_id"][i] for p in parents])
+                    in_chans = np.unique(in_chans)
+                if len(in_chans) > 0:
+                    weights[(i, n)] = weights.get((i, n), 0.0) + outsize
+    return weights
+
+
+def analytical_relative_moments(active_weights, C_matrix, sigmas,
+                                n_mc=20000, rng=None):
+    """Return (rel_std_per_sigma, rel_mad_per_sigma) for the debiased
+    zero-mean log-normal perturbation.
+
+    Math: with X_(i,n) = weight[(i,n)] * C[i,n] and i.i.d. log-normal
+    multipliers L_(i,n) of mean 1 and variance sigma^2,
+        Var(cost(C')) = sigma^2 * sum X^2,
+    giving the exact closed-form relative std
+        std/cost(C) = sigma * sqrt(sum X^2) / sum X.
+    Relative MAD has no closed form (weighted sum of log-normals) and is
+    estimated via fast iid Monte Carlo on the L_(i,n) multipliers --
+    this requires no frozen-model evaluations and so is "analytical" in
+    the sense of depending only on (active_weights, C, sigma).
+    """
+    zero = {float(s): 0.0 for s in sigmas}
+    if not active_weights:
+        return zero, dict(zero)
+    C_arr = np.asarray(C_matrix, dtype=float)
+    keys = list(active_weights.keys())
+    X = np.array([active_weights[k] * C_arr[k[0], k[1]] for k in keys],
+                 dtype=float)
+    cost_C = float(X.sum())
+    if cost_C <= 0 or not np.isfinite(cost_C):
+        return zero, dict(zero)
+    sum_X2 = float((X * X).sum())
+    rng = rng if rng is not None else np.random.default_rng(0)
+    out_std, out_mad = {}, {}
+    for sigma in sigmas:
+        s = float(sigma)
+        if s == 0.0:
+            out_std[s] = 0.0
+            out_mad[s] = 0.0
+            continue
+        out_std[s] = s * np.sqrt(sum_X2) / cost_C
+        sigma_log = np.sqrt(np.log(1.0 + s ** 2))
+        eta = rng.normal(0.0, sigma_log, size=(n_mc, len(X)))
+        L = np.exp(eta - 0.5 * sigma_log ** 2)
+        costs = L @ X
+        out_mad[s] = float(np.mean(np.abs(costs - cost_C))) / cost_C
+    return out_std, out_mad
+
+
 # ── evaluation ───────────────────────────────────────────────────────────────
 
 def eval_on_perturbed(model, partition, new_maps):
@@ -272,6 +421,11 @@ def run_eval(args):
     (\\penbr family) and one trained with the AOP penalty (\\pencr family),
     matching the two \\Problemname-frozen rows in the draft table. Both are
     evaluated under the same realized-cost metric on each C'.
+
+    Returns (df, active_weights, base_maps), where active_weights[method]
+    is the per-(i,n) communication-weight dict that lets
+    analytical_relative_moments compute the relative std and MAD of
+    cost(C') without further model evaluations.
     """
     camp_tcc_model, camp_tcc_part = load_run(args.camp_tcc_dir, args.model,
                                              args.num_classes, args.device)
@@ -295,6 +449,26 @@ def run_eval(args):
     if args.dense_dir is not None:
         dense_model, dense_part = load_run(args.dense_dir, args.model,
                                            args.num_classes, args.device)
+
+    # Per-method active-weight extraction. Cheap, done once. Used by
+    # analytical_relative_moments to overlay closed-form / MC curves on
+    # the plot. For each method the equality
+    #   sum_(i,n) weight[(i,n)] * C[i,n]  ==  cost(C)   (at sigma=0)
+    # holds by construction (same loop structure as the empirical eval).
+    active_weights = {
+        "CaMP-frozen-TCC": extract_active_weights_model(
+            camp_tcc_model, camp_tcc_part),
+        "CaMP-frozen-AOP": extract_active_weights_model(
+            camp_aop_model, camp_aop_part),
+        "CaP-frozen":      extract_active_weights_model(
+            cap_model, cap_part),
+    }
+    if dense_model is not None:
+        active_weights["Dense-frozen"] = extract_active_weights_model(
+            dense_model, dense_part)
+    else:
+        active_weights["Dense-frozen"] = extract_active_weights_dense(
+            camp_tcc_part)
 
     rows = []
     for ptype in args.perturbations:
@@ -354,7 +528,7 @@ def run_eval(args):
     df = pd.DataFrame(rows)
     df["topology"] = args.topology
     df["pr"] = args.pr
-    return df
+    return df, active_weights, base_maps
 
 
 # ── oracle training ──────────────────────────────────────────────────────────
@@ -510,54 +684,99 @@ PLOT_METHODS = [
 ]
 
 
-def emit_plot(df, out_dir, topology, ptype, pr, n_draws):
-    """One PDF + PNG per topology: relative growth of realized comm. cost
-    vs noise scale sigma. Curves are normalized so that every method
-    starts at 0 at sigma=0 and grows. Shaded band = mean +/- SE over the
-    n_draws perturbation samples. X-axis is symmetric-log (linear near 0,
-    log thereafter) so sigma=0 is visible alongside large-sigma stress
-    points in one figure; y-axis is symlog for the same reason (relative
-    growth spans many orders of magnitude across the sigma sweep).
+def _empirical_stat(df_sub, statistic, baseline):
+    """Return (sigmas, values) of the per-sigma empirical statistic,
+    normalized by the (deterministic) sigma=0 baseline cost. Note we do
+    NOT center on the empirical mean -- centering on cost(C) is correct
+    because E[cost(C')] = cost(C) holds exactly under our debiased noise.
+    """
+    if statistic == "std":
+        agg = df_sub.groupby("param")["value"].agg(["std", "count"]).sort_index()
+        y = agg["std"].fillna(0.0).to_numpy(dtype=float) / baseline
+    elif statistic == "mad":
+        sub2 = df_sub.copy()
+        sub2["absdev"] = (sub2["value"] - baseline).abs()
+        agg = sub2.groupby("param")["absdev"].agg(["mean", "count"]).sort_index()
+        y = agg["mean"].to_numpy(dtype=float) / baseline
+    else:
+        raise ValueError(f"unknown statistic: {statistic}")
+    return agg.index.to_numpy(dtype=float), y
+
+
+STAT_LABELS = {
+    "std": (r"$\mathrm{Std}\bigl(\mathrm{cost}(C')\bigr) / \mathrm{cost}(C)$",
+            "relative std"),
+    "mad": (r"$\mathbb{E}\bigl[\,|\mathrm{cost}(C')-\mathrm{cost}(C)|\,\bigr] / \mathrm{cost}(C)$",
+            "relative MAD"),
+}
+
+
+def emit_plot(df, out_dir, topology, ptype, pr, n_draws, statistic,
+              analyticals):
+    """One PDF + PNG per topology + statistic. statistic in {'std', 'mad'}.
+
+    Plots the relative dispersion of realized cost under the debiased
+    zero-mean log-normal perturbation. Two reasons not to plot the
+    mean: (i) E[cost(C')] = cost(C) by construction, so the empirical
+    mean is an unbiased estimator of *zero*-growth and only sampling
+    noise drives it away; (ii) std and MAD are symmetric statistics --
+    they respect the zero-mean symmetry of the perturbation, whereas a
+    one-sided quantile does not.
+
+    Solid + markers = empirical (over n_draws perturbation samples).
+    Dashed = analytical -- closed-form for std (exact) and iid Monte
+    Carlo on the log-normal multipliers for MAD (no model eval).
     """
     fig, ax = plt.subplots(figsize=(6.0, 4.2))
-
+    sub_pt = df[df["perturbation"] == ptype]
     drawn = 0
     for method_key, label, color, marker in PLOT_METHODS:
-        agg = _agg(df, ptype, method_key)
-        if agg.empty or 0.0 not in agg.index:
+        sub = sub_pt[sub_pt["method"] == method_key]
+        if sub.empty or 0.0 not in sub["param"].values:
             continue
-        baseline = float(agg.loc[0.0, "mean"])
+        baseline = float(sub[sub["param"] == 0.0]["value"].mean())
         if not np.isfinite(baseline) or baseline <= 0:
             continue
-        agg = agg.sort_index()
-        sigmas = agg.index.to_numpy(dtype=float)
-        rel = (agg["mean"].to_numpy(dtype=float) - baseline) / baseline
-        n_eff = np.maximum(agg["count"].to_numpy(dtype=float), 1.0)
-        std = np.nan_to_num(agg["std"].to_numpy(dtype=float), nan=0.0)
-        se = (std / np.sqrt(n_eff)) / baseline
-        ax.plot(sigmas, rel, color=color, marker=marker, markersize=4.5,
+        sigmas_emp, y_emp = _empirical_stat(sub, statistic, baseline)
+        ax.plot(sigmas_emp, y_emp, color=color, marker=marker, markersize=4.5,
                 linewidth=1.6, label=label)
-        ax.fill_between(sigmas, rel - se, rel + se,
-                        color=color, alpha=0.15, linewidth=0)
+        an = analyticals.get(method_key)
+        if an:
+            an_sigmas = np.array(sorted(an.keys()), dtype=float)
+            an_y = np.array([an[s] for s in an_sigmas], dtype=float)
+            ax.plot(an_sigmas, an_y, color=color, linestyle="--",
+                    linewidth=1.2, alpha=0.85)
         drawn += 1
 
     if drawn == 0:
         plt.close(fig)
-        print(f"  Plot  -> (skipped: no data for {topology})")
+        print(f"  Plot  -> (skipped: no data for {topology}/{statistic})")
         return
 
     ax.set_xscale("symlog", linthresh=0.05)
-    ax.set_yscale("symlog", linthresh=0.1)
+    ax.set_yscale("symlog", linthresh=0.05)
     ax.axhline(0.0, color="black", linewidth=0.6)
     ax.set_xlabel(r"Noise scale $\sigma$ (relative std of $C'$)")
-    ax.set_ylabel(r"$\mathrm{cost}(C')/\mathrm{cost}(C) - 1$")
+    ylabel, short = STAT_LABELS[statistic]
+    ax.set_ylabel(ylabel)
     ax.set_title(f"{topology}  (pr={pr}, {n_draws} draws/level)")
     ax.grid(True, which="both", alpha=0.3)
-    ax.legend(loc="upper left", fontsize=8, frameon=True)
+
+    # Two-column legend: method colors on the left, line-style key on the right.
+    from matplotlib.lines import Line2D
+    method_h, method_l = ax.get_legend_handles_labels()
+    style_h = [
+        Line2D([0], [0], color="gray", linewidth=1.6, marker="o",
+               linestyle="-", label=f"empirical ($n={n_draws}$)"),
+        Line2D([0], [0], color="gray", linewidth=1.2, linestyle="--",
+               label="analytical"),
+    ]
+    ax.legend(method_h + style_h, method_l + [h.get_label() for h in style_h],
+              loc="upper left", fontsize=7, frameon=True, ncol=1)
     fig.tight_layout()
 
-    pdf_path = os.path.join(out_dir, f"sensitivity_{topology}.pdf")
-    png_path = os.path.join(out_dir, f"sensitivity_{topology}.png")
+    pdf_path = os.path.join(out_dir, f"sensitivity_{topology}_{statistic}.pdf")
+    png_path = os.path.join(out_dir, f"sensitivity_{topology}_{statistic}.png")
     fig.savefig(pdf_path)
     fig.savefig(png_path, dpi=150)
     plt.close(fig)
@@ -645,11 +864,26 @@ def main():
                     ("--cap_dir",      args.cap_dir)) if val is None]
         if missing:
             raise SystemExit(f"{', '.join(missing)} required for --mode eval/all.")
-        df = run_eval(args)
+        df, active_weights, base_maps = run_eval(args)
         emit_csv(df, args.out_dir, args.topology)
+        # Denser sigma grid for the smooth analytical curves; superset of
+        # the empirical SIGMA_LEVELS so the dashed line passes through the
+        # marker positions exactly.
+        sigmas_dense = sorted(
+            set(float(s) for s in SIGMA_LEVELS).union(
+                {0.0} | set(np.geomspace(0.005, 10.0, 60))))
         for ptype in args.perturbations:
+            analyticals_std, analyticals_mad = {}, {}
+            an_rng = np.random.default_rng(args.seed + 9_999)
+            for method, w in active_weights.items():
+                std_d, mad_d = analytical_relative_moments(
+                    w, base_maps, sigmas_dense, n_mc=20000, rng=an_rng)
+                analyticals_std[method] = std_d
+                analyticals_mad[method] = mad_d
             emit_plot(df, args.out_dir, args.topology, ptype,
-                      args.pr, args.n_draws)
+                      args.pr, args.n_draws, "std", analyticals_std)
+            emit_plot(df, args.out_dir, args.topology, ptype,
+                      args.pr, args.n_draws, "mad", analyticals_mad)
 
 
 if __name__ == "__main__":
