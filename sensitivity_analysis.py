@@ -383,6 +383,84 @@ def analytical_relative_moments(active_weights, C_matrix, sigmas,
     return out_std, out_mad
 
 
+# ── per-layer per-pair bits, for the delay experiment ───────────────────────
+# The "realized cost" metric is linear in C and aggregates everything to a
+# scalar. The delay experiment needs more structure: per layer, per
+# (source machine, dest machine) pair, the bytes transmitted. With c_{i,n} =
+# 1/bandwidth on link (i,n) (log-normal with mean C[i,n]), the per-pair
+# delay on layer l is bytes_l[i,n] * c_{i,n}; the layer delay is the max
+# over (i,n) (all pairs send in parallel); the pipelined and serial
+# end-to-end delays are max_l and sum_l over those, respectively.
+
+def compute_per_layer_per_pair_bits(model, partition):
+    """Return a list of (num_machines x num_machines) bytes-transmitted
+    matrices, one per layer that has parent layers. Matches the iteration
+    structure of compute_communication_cost_and_kbits exactly:
+    one outsize-byte message per (output filter on n, source machine i)
+    pair, multiplied by 4 bytes/float. Diagonal entries are 0.
+    """
+    if not partition or "num" not in partition or "maps" not in partition:
+        return [], []
+    num_machines = partition["num"]
+    layer_bits = []
+    layer_names = []
+    for name, W in model.named_parameters():
+        if name not in partition:
+            continue
+        weight = W.cpu().detach().numpy()
+        shape = weight.shape
+        is_conv = (len(shape) == 4)
+        layer_partition = partition[name]
+        outsize = layer_partition.get("outsize", 1) or 1
+        parents = layer_partition.get("parents", [])
+        if not parents:
+            continue
+        if is_conv:
+            W_flat = np.sum(np.abs(weight.reshape(shape[0], shape[1], -1)),
+                            axis=2)
+        else:
+            W_flat = np.abs(weight)
+        bits = np.zeros((num_machines, num_machines), dtype=float)
+        for n in range(num_machines):
+            for C_out in layer_partition["filter_id"][n]:
+                for i in range(num_machines):
+                    if i == n:
+                        continue
+                    if len(parents) == 1:
+                        input_channels = partition[parents[0]]["filter_id"][i]
+                    else:
+                        input_channels = np.concatenate(
+                            [partition[p]["filter_id"][i] for p in parents])
+                        input_channels = np.unique(input_channels)
+                    if (len(input_channels) > 0
+                            and np.any(W_flat[C_out, input_channels])):
+                        # One message of outsize floats (4 bytes each) per
+                        # (output filter, source machine) pair.
+                        bits[i, n] += outsize * 4.0
+        layer_bits.append(bits)
+        layer_names.append(name)
+    return layer_bits, layer_names
+
+
+def eval_delays_on_perturbed(layer_bits, new_maps):
+    """Compute pipelined (max_l) and serial (sum_l) end-to-end delays
+    under a perturbed cost matrix new_maps interpreted as c = 1/bandwidth.
+
+    For each layer l, the layer delay d_l is the max over machine pairs of
+    bytes_l[i,n] * c_{i,n}: all pairs transmit in parallel, so the slowest
+    pair determines the layer's wall-clock. Then:
+        pipelined = max_l d_l        (steady-state throughput-limited delay)
+        serial    = sum_l d_l        (single-sample end-to-end latency)
+    """
+    if not layer_bits:
+        return 0.0, 0.0
+    C = np.asarray(new_maps, dtype=float)
+    layer_d = [(b * C).max() for b in layer_bits]
+    pipelined = float(max(layer_d)) if layer_d else 0.0
+    serial = float(sum(layer_d))
+    return pipelined, serial
+
+
 # ── evaluation ───────────────────────────────────────────────────────────────
 
 def eval_on_perturbed(model, partition, new_maps):
@@ -529,6 +607,71 @@ def run_eval(args):
     df["topology"] = args.topology
     df["pr"] = args.pr
     return df, active_weights, base_maps
+
+
+def run_delays(args):
+    """Compute pipelined and serial inference delays for each method under
+    perturbations of 1/bandwidth.
+
+    Model: for every link (i, n) the per-byte transmission cost
+    c_{i,n} = 1/bandwidth_{i,n} is treated as log-normal with mean
+    C[i,n] (the training-time cost matrix) and relative standard deviation
+    sigma. For each layer l, the layer delay is
+        d_l = max over (i,n) of bytes_l[i,n] * c_{i,n}
+    (all machine pairs transmit in parallel). The two reported metrics
+    aggregate across layers:
+        pipelined = max_l d_l  (steady-state throughput-limited delay)
+        serial    = sum_l d_l  (single-sample end-to-end latency)
+
+    Returns a tidy DataFrame with one row per
+    (perturbation, sigma, draw, method, metric) and column 'value'.
+    """
+    camp_tcc_model, camp_tcc_part = load_run(args.camp_tcc_dir, args.model,
+                                             args.num_classes, args.device)
+    camp_aop_model, camp_aop_part = load_run(args.camp_aop_dir, args.model,
+                                             args.num_classes, args.device)
+    cap_model, cap_part = load_run(args.cap_dir, args.model,
+                                   args.num_classes, args.device)
+
+    base_maps = np.asarray(camp_tcc_part["maps"], dtype=float)
+    aop_maps  = np.asarray(camp_aop_part["maps"], dtype=float)
+    if base_maps.shape != aop_maps.shape or not np.allclose(base_maps, aop_maps):
+        print("WARNING: --camp_tcc_dir and --camp_aop_dir have different "
+              "partition['maps']. Anchoring perturbations to the TCC variant.")
+
+    # Per-(layer, i, n) bytes depend only on (model, partition), not on C.
+    # Compute once per method; reuse across all draws.
+    print("  Extracting per-layer per-pair bytes for each method ...")
+    bits_tcc, _ = compute_per_layer_per_pair_bits(camp_tcc_model, camp_tcc_part)
+    bits_aop, _ = compute_per_layer_per_pair_bits(camp_aop_model, camp_aop_part)
+    bits_cap, _ = compute_per_layer_per_pair_bits(cap_model,      cap_part)
+
+    method_bits = [
+        ("CaMP-frozen-TCC", bits_tcc),
+        ("CaMP-frozen-AOP", bits_aop),
+        ("CaP-frozen",      bits_cap),
+    ]
+
+    rows = []
+    for ptype in args.perturbations:
+        spec = PERTURBATIONS[ptype]
+        for level in spec["levels"]:
+            for draw in range(args.n_draws):
+                new_maps = sample_C_prime(ptype, level, draw, base_maps,
+                                          args.seed)
+                for method_name, bits in method_bits:
+                    pipelined, serial = eval_delays_on_perturbed(bits, new_maps)
+                    rows.append(dict(perturbation=ptype, param=level, draw=draw,
+                                     method=method_name, metric="pipelined",
+                                     value=pipelined))
+                    rows.append(dict(perturbation=ptype, param=level, draw=draw,
+                                     method=method_name, metric="serial",
+                                     value=serial))
+
+    df = pd.DataFrame(rows)
+    df["topology"] = args.topology
+    df["pr"] = args.pr
+    return df
 
 
 # ── oracle training ──────────────────────────────────────────────────────────
@@ -784,14 +927,108 @@ def emit_plot(df, out_dir, topology, ptype, pr, n_draws, statistic,
     print(f"  Plot  -> {png_path}")
 
 
+# ── output: delay-experiment LaTeX tables ───────────────────────────────────
+
+def _fmt_delay(x):
+    """Compact scientific-notation formatter for delay magnitudes."""
+    if x is None or (isinstance(x, float) and not np.isfinite(x)):
+        return "--"
+    if x == 0:
+        return "0"
+    if abs(x) >= 1e5 or abs(x) < 1e-2:
+        return f"{x:.2e}"
+    if abs(x) >= 100:
+        return f"{x:.0f}"
+    return f"{x:.2f}"
+
+
+def emit_latex_delays(df, out_dir, topology, pr, n_draws, ptype="lognormal"):
+    """Emit two LaTeX tables, one per delay metric (pipelined, serial).
+    Each table has rows = three methods and columns = sigma levels;
+    cells are the mean over draws of the per-cell delay.
+    """
+    spec = PERTURBATIONS[ptype]
+    levels = spec["levels"]
+    pname  = spec["param_name"]
+
+    methods = [
+        ("CaMP-frozen-TCC", r"\Problemname-frozen ($\penbr$)"),
+        ("CaMP-frozen-AOP", r"\Problemname-frozen ($\pencr$)"),
+        ("CaP-frozen",      r"\Baseline-frozen"),
+    ]
+    metric_specs = [
+        ("pipelined",
+         r"Pipelined latency $\max_l d_l$",
+         "pipelined latency"),
+        ("serial",
+         r"Serial latency $\sum_l d_l$",
+         "serial latency"),
+    ]
+
+    for metric, metric_header, metric_caption in metric_specs:
+        body_lines = []
+        for method_key, method_label in methods:
+            sub = df[(df.perturbation == ptype) &
+                     (df.method == method_key) &
+                     (df.metric == metric)]
+            means = sub.groupby("param")["value"].mean()
+            cells = " & ".join(_fmt_delay(means.get(lv, np.nan))
+                               for lv in levels)
+            body_lines.append(f"{method_label} & {cells}\\\\")
+        body = "\n".join(body_lines)
+
+        n_cols = len(levels)
+        col_spec = "l|" + "c" * n_cols
+        header_cells = " & ".join(f"${pname}={lv}$" for lv in levels)
+
+        tex = (
+            "\\begin{table}[t]\n"
+            "\\centering\n"
+            "\\resizebox{\\columnwidth}{!}{%\n"
+            f"\\begin{{tabular}}{{{col_spec}}}\n"
+            "\\toprule\n"
+            f"\\textbf{{Method}} & \\multicolumn{{{n_cols}}}{{c}}"
+            f"{{\\textbf{{{metric_header} (mean over {n_draws} draws)}}}}\\\\\n"
+            f"\\cline{{2-{n_cols + 1}}}\n"
+            f"& {header_cells}\\\\\n"
+            "\\midrule\n"
+            f"{body}\n"
+            "\\bottomrule\n"
+            "\\end{tabular}\n"
+            "}\n"
+            "\\caption{Mean " + metric_caption + " for the \\emph{"
+            + topology + "} topology at $\\text{pr}=" + str(pr) + "$. "
+            "The per-link cost $c_{m,m'}=1/\\text{bandwidth}_{m,m'}$ is "
+            "log-normal with mean $\\C_{m,m'}$ and relative std $\\sigma$; "
+            "the per-layer delay is the max over machine pairs of "
+            "$\\text{bytes}_l[m,m'] \\cdot c_{m,m'}$. Delay units are bytes "
+            "$\\times$ the units of $\\C$. Values averaged over "
+            + str(n_draws) + " perturbation draws.}\n"
+            f"\\label{{tab:delay_{topology}_{metric}}}\n"
+            "\\end{table}\n"
+        )
+
+        path = os.path.join(out_dir, f"delay_{topology}_{metric}.tex")
+        with open(path, "w") as f:
+            f.write(tex)
+        print(f"  LaTeX -> {path}")
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 def main():
     p = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--mode", choices=["eval", "train_oracles", "all"],
-                   default="eval")
+    p.add_argument("--mode",
+                   choices=["eval", "train_oracles", "all", "delays"],
+                   default="eval",
+                   help="'eval'/'train_oracles'/'all' run the realized-cost "
+                        "sensitivity analysis. 'delays' runs the inference-"
+                        "delay experiment: c=1/bandwidth on each link is "
+                        "log-normal with mean C, per-layer delay is the max "
+                        "over machine pairs of bytes*c, and pipelined "
+                        "(max_l) and serial (sum_l) latencies are reported.")
 
     p.add_argument("--camp_tcc_dir", required=True,
                    help="Trained CaMP-TCC experiment folder (model trained "
@@ -884,6 +1121,23 @@ def main():
                       args.pr, args.n_draws, "std", analyticals_std)
             emit_plot(df, args.out_dir, args.topology, ptype,
                       args.pr, args.n_draws, "mad", analyticals_mad)
+
+    if args.mode == "delays":
+        missing = [name for name, val in
+                   (("--camp_aop_dir", args.camp_aop_dir),
+                    ("--cap_dir",      args.cap_dir)) if val is None]
+        if missing:
+            raise SystemExit(f"{', '.join(missing)} required for --mode delays.")
+        df_delays = run_delays(args)
+        # Reuse emit_csv for the long-form record; the delay file has the
+        # extra 'metric' column.
+        delays_csv = os.path.join(args.out_dir,
+                                  f"delays_{args.topology}.csv")
+        df_delays.to_csv(delays_csv, index=False)
+        print(f"  CSV   -> {delays_csv}")
+        for ptype in args.perturbations:
+            emit_latex_delays(df_delays, args.out_dir, args.topology,
+                              args.pr, args.n_draws, ptype=ptype)
 
 
 if __name__ == "__main__":
