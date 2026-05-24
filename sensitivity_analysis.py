@@ -828,10 +828,13 @@ PLOT_METHODS = [
 
 
 def _empirical_stat(df_sub, statistic, baseline):
-    """Return (sigmas, values) of the per-sigma empirical statistic,
-    normalized by the (deterministic) sigma=0 baseline cost. Note we do
-    NOT center on the empirical mean -- centering on cost(C) is correct
-    because E[cost(C')] = cost(C) holds exactly under our debiased noise.
+    """Return (sigmas, values) of the per-sigma empirical statistic.
+    For "std" and "mad" the value is normalized by the (deterministic)
+    sigma=0 baseline cost; for "mean" the absolute mean is returned
+    (no normalization), so the y-axis shows E[cost(C')] in the native
+    units of cost(C). Centering on cost(C) (rather than the empirical
+    mean) is correct because E[cost(C')] = cost(C) holds exactly under
+    our debiased noise.
     """
     if statistic == "std":
         agg = df_sub.groupby("param")["value"].agg(["std", "count"]).sort_index()
@@ -841,6 +844,9 @@ def _empirical_stat(df_sub, statistic, baseline):
         sub2["absdev"] = (sub2["value"] - baseline).abs()
         agg = sub2.groupby("param")["absdev"].agg(["mean", "count"]).sort_index()
         y = agg["mean"].to_numpy(dtype=float) / baseline
+    elif statistic == "mean":
+        agg = df_sub.groupby("param")["value"].agg(["mean", "count"]).sort_index()
+        y = agg["mean"].to_numpy(dtype=float)
     else:
         raise ValueError(f"unknown statistic: {statistic}")
     return agg.index.to_numpy(dtype=float), y
@@ -851,24 +857,27 @@ STAT_LABELS = {
             "relative std"),
     "mad": (r"$\mathbb{E}\bigl[\,|\mathrm{cost}(C')-\mathrm{cost}(C)|\,\bigr] / \mathrm{cost}(C)$",
             "relative MAD"),
+    "mean": (r"$\mathbb{E}\bigl[\mathrm{cost}(C')\bigr]$",
+             "absolute mean cost"),
 }
 
 
 def emit_plot(df, out_dir, topology, ptype, pr, n_draws, statistic,
               analyticals):
-    """One PDF + PNG per topology + statistic. statistic in {'std', 'mad'}.
+    """One PDF + PNG per topology + statistic. statistic in {'std', 'mad', 'mean'}.
 
-    Plots the relative dispersion of realized cost under the debiased
-    zero-mean log-normal perturbation. Two reasons not to plot the
-    mean: (i) E[cost(C')] = cost(C) by construction, so the empirical
-    mean is an unbiased estimator of *zero*-growth and only sampling
-    noise drives it away; (ii) std and MAD are symmetric statistics --
-    they respect the zero-mean symmetry of the perturbation, whereas a
-    one-sided quantile does not.
+    For 'std' and 'mad': plots the relative dispersion of realized cost
+    under the debiased zero-mean log-normal perturbation, normalized by
+    cost(C). For 'mean': plots the absolute E[cost(C')] in the native
+    units of cost(C). By construction E[cost(C')] = cost(C), so the
+    'mean' lines are approximately horizontal (up to MC noise) at each
+    method's cost(C); their relative levels show that the per-method
+    advantage CaMP < CaP persists for every sigma in expectation.
 
     Solid + markers = empirical (over n_draws perturbation samples).
     Dashed = analytical -- closed-form for std (exact) and iid Monte
-    Carlo on the log-normal multipliers for MAD (no model eval).
+    Carlo on the log-normal multipliers for MAD (no model eval); not
+    drawn for 'mean' (the analytical is trivially the constant cost(C)).
     """
     fig, ax = plt.subplots(figsize=(6.0, 4.2))
     sub_pt = df[df["perturbation"] == ptype]
@@ -897,8 +906,11 @@ def emit_plot(df, out_dir, topology, ptype, pr, n_draws, statistic,
         return
 
     ax.set_xscale("symlog", linthresh=0.05)
-    ax.set_yscale("symlog", linthresh=0.05)
-    ax.axhline(0.0, color="black", linewidth=0.6)
+    if statistic == "mean":
+        ax.set_yscale("log")
+    else:
+        ax.set_yscale("symlog", linthresh=0.05)
+        ax.axhline(0.0, color="black", linewidth=0.6)
     ax.set_xlabel(r"Noise scale $\sigma$ (relative std of $C'$)")
     ylabel, short = STAT_LABELS[statistic]
     ax.set_ylabel(ylabel)
@@ -1121,6 +1133,8 @@ def main():
                       args.pr, args.n_draws, "std", analyticals_std)
             emit_plot(df, args.out_dir, args.topology, ptype,
                       args.pr, args.n_draws, "mad", analyticals_mad)
+            emit_plot(df, args.out_dir, args.topology, ptype,
+                      args.pr, args.n_draws, "mean", {})
 
     if args.mode == "delays":
         missing = [name for name, val in
