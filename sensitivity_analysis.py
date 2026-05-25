@@ -215,9 +215,15 @@ def load_run(folder, model_name, num_classes, device):
 # ── analytic dense-frozen cost ───────────────────────────────────────────────
 
 def dense_comm_cost(partition):
-    """Realized comm cost for a fully-dense model: every (output filter,
-    input channel) pair across machines requires communication. Avoids
-    needing a dense checkpoint on disk."""
+    """Realized comm cost for a fully-dense (pr=0) model on the same
+    partition layout: every output filter on machine n receives one
+    outsize-byte message from every other machine i that holds any of its
+    parent input channels. Mirrors compute_communication_cost_and_kbits
+    on a model where the weight support is all non-zero, so it is
+    metric-consistent with the pruned-method evaluation (every output
+    filter contributes outsize bytes per active source machine).
+    Avoids needing a dense checkpoint on disk.
+    """
     if not partition or "num" not in partition or "maps" not in partition:
         return 0.0
     num_machines = partition["num"]
@@ -233,7 +239,8 @@ def dense_comm_cost(partition):
             continue
         outsize = layer_partition.get("outsize", 1) or 1
         for n in range(num_machines):
-            if len(layer_partition["filter_id"][n]) == 0:
+            n_out_filters = len(layer_partition["filter_id"][n])
+            if n_out_filters == 0:
                 continue
             for i in range(num_machines):
                 if i == n:
@@ -245,7 +252,7 @@ def dense_comm_cost(partition):
                         [partition[p]["filter_id"][i] for p in parents])
                     in_chans = np.unique(in_chans)
                 if len(in_chans) > 0:
-                    total += C[i][n] * outsize
+                    total += C[i][n] * outsize * n_out_filters
     return total
 
 
@@ -306,9 +313,12 @@ def extract_active_weights_model(model, partition):
 
 
 def extract_active_weights_dense(partition):
-    """Per-(i,n) weight matching the analytic dense_comm_cost formula.
-    Used when no dense checkpoint is provided -- consistent with the
-    empirical dense baseline so analytical and empirical lines overlap.
+    """Per-(i,n) weight for a fully-dense (pr=0) model on the same
+    partition layout. Equivalent to running extract_active_weights_model
+    on a model whose weight support is all non-zero: every output filter
+    on machine n receives outsize bytes from every other machine i that
+    holds any of its parent input channels. Consistent with the analytic
+    dense_comm_cost formula so analytical and empirical lines overlap.
     """
     weights = {}
     if not partition or "num" not in partition or "maps" not in partition:
@@ -324,7 +334,8 @@ def extract_active_weights_dense(partition):
             continue
         outsize = layer_partition.get("outsize", 1) or 1
         for n in range(num_machines):
-            if len(layer_partition["filter_id"][n]) == 0:
+            n_out_filters = len(layer_partition["filter_id"][n])
+            if n_out_filters == 0:
                 continue
             for i in range(num_machines):
                 if i == n:
@@ -336,7 +347,8 @@ def extract_active_weights_dense(partition):
                         [partition[p]["filter_id"][i] for p in parents])
                     in_chans = np.unique(in_chans)
                 if len(in_chans) > 0:
-                    weights[(i, n)] = weights.get((i, n), 0.0) + outsize
+                    weights[(i, n)] = (weights.get((i, n), 0.0)
+                                       + outsize * n_out_filters)
     return weights
 
 
@@ -954,6 +966,9 @@ def _fmt_delay(x):
     return f"{x:.2f}"
 
 
+PARAM_TEX = {"sigma": r"\sigma", "p": "p", "k": "k"}
+
+
 def emit_latex_delays(df, out_dir, topology, pr, n_draws, ptype="lognormal"):
     """Emit two LaTeX tables, one per delay metric (pipelined, serial).
     Each table has rows = three methods and columns = sigma levels;
@@ -961,7 +976,11 @@ def emit_latex_delays(df, out_dir, topology, pr, n_draws, ptype="lognormal"):
     """
     spec = PERTURBATIONS[ptype]
     levels = spec["levels"]
-    pname  = spec["param_name"]
+    pname_tex = PARAM_TEX.get(spec["param_name"], spec["param_name"])
+    # Underscores in topology names break text-mode LaTeX; escape them so the
+    # caption and label compile under any preamble (no \usepackage{underscore}
+    # required).
+    topology_tex = topology.replace("_", r"\_")
 
     methods = [
         ("CaMP-frozen-TCC", r"\Problemname-frozen ($\penbr$)"),
@@ -991,7 +1010,7 @@ def emit_latex_delays(df, out_dir, topology, pr, n_draws, ptype="lognormal"):
 
         n_cols = len(levels)
         col_spec = "l|" + "c" * n_cols
-        header_cells = " & ".join(f"${pname}={lv}$" for lv in levels)
+        header_cells = " & ".join(f"${pname_tex}={lv}$" for lv in levels)
 
         tex = (
             "\\begin{table}[t]\n"
@@ -1009,7 +1028,7 @@ def emit_latex_delays(df, out_dir, topology, pr, n_draws, ptype="lognormal"):
             "\\end{tabular}\n"
             "}\n"
             "\\caption{Mean " + metric_caption + " for the \\emph{"
-            + topology + "} topology at $\\text{pr}=" + str(pr) + "$. "
+            + topology_tex + "} topology at $\\text{pr}=" + str(pr) + "$. "
             "The per-link cost $c_{m,m'}=1/\\text{bandwidth}_{m,m'}$ is "
             "log-normal with mean $\\C_{m,m'}$ and relative std $\\sigma$; "
             "the per-layer delay is the max over machine pairs of "
