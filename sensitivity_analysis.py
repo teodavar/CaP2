@@ -819,11 +819,11 @@ def _agg(df, ptype, method):
 # Curves to draw, in the order they appear in the legend. Tuple is
 # (method-name-in-df, legend-label, color, marker).
 PLOT_METHODS = [
-    ("CaMP-frozen-TCC",    r"\textsc{CaMP}-frozen (TCC)",      "tab:blue",   "o"),
-    ("CaMP-frozen-AOP",    r"\textsc{CaMP}-frozen (AOP)",      "tab:orange", "s"),
-    ("CaP-frozen",         r"\textsc{CaP}-frozen (baseline)",  "tab:green",  "^"),
-    ("Dense-frozen",       r"Dense-frozen",                    "tab:red",    "D"),
-    ("CaMP-Cprime-oracle", r"\textsc{CaMP}-$C'$ (oracle)",     "tab:purple", "v"),
+    ("CaMP-frozen-TCC",    "CaMP-frozen (TCC)",                 "tab:blue",   "o"),
+    ("CaMP-frozen-AOP",    "CaMP-frozen (AOP)",                 "tab:orange", "s"),
+    ("CaP-frozen",         "CaP-frozen (baseline)",             "tab:green",  "^"),
+    ("Dense-frozen",       "Dense-frozen",                      "tab:red",    "D"),
+    ("CaMP-Cprime-oracle", r"CaMP-$C'$ (oracle)",               "tab:purple", "v"),
 ]
 
 
@@ -853,11 +853,11 @@ def _empirical_stat(df_sub, statistic, baseline):
 
 
 STAT_LABELS = {
-    "std": (r"$\mathrm{Std}\bigl(\mathrm{cost}(C')\bigr) / \mathrm{cost}(C)$",
+    "std": (r"$\mathrm{Std}(\mathrm{cost}(C')) / \mathrm{cost}(C)$",
             "relative std"),
-    "mad": (r"$\mathbb{E}\bigl[\,|\mathrm{cost}(C')-\mathrm{cost}(C)|\,\bigr] / \mathrm{cost}(C)$",
+    "mad": (r"$\mathbb{E}[\,|\mathrm{cost}(C')-\mathrm{cost}(C)|\,] / \mathrm{cost}(C)$",
             "relative MAD"),
-    "mean": (r"$\mathbb{E}\bigl[\mathrm{cost}(C')\bigr]$",
+    "mean": (r"$\mathbb{E}[\mathrm{cost}(C')]$",
              "absolute mean cost"),
 }
 
