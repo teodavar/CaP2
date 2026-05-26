@@ -18,6 +18,7 @@
 # TOPOLOGY choices: Dtelekom_cost (default), Abilene_cost,
 #                   BarabasiAlbert_cost, WattsStrogatz_cost
 #
+#
 # Examples:
 #   sbatch submit_sensitivity.sh
 #   sbatch --export=ALL,TOPOLOGY=Abilene_cost submit_sensitivity.sh
